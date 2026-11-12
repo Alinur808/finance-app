@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { AlertTriangle, BadgeCheck, Bot, CalendarClock, Lightbulb, Loader2, PartyPopper, Repeat, Scale, Sparkles, TrendingDown, Zap } from 'lucide-react';
+import { AlertTriangle, BadgeCheck, Bot, CalendarClock, Lightbulb, Loader2, PartyPopper, PenLine, Repeat, Scale, Sparkles, TrendingDown, Zap } from 'lucide-react';
 import { useFinance } from '../../context/FinanceContext.jsx';
 import { describeWeeks, getAIAdvice } from '../../utils/advisor.js';
 import { formatFullDate } from '../../utils/dates.js';
@@ -16,13 +16,19 @@ const STATUS = {
   behind: { icon: AlertTriangle, label: 'Отстаёте от графика', cls: 'bg-amber-50 text-amber-800 ring-amber-100' },
   negative: { icon: TrendingDown, label: 'Расходы больше доходов', cls: 'bg-red-50 text-red-700 ring-red-100' },
   done: { icon: PartyPopper, label: 'Цель достигнута', cls: 'bg-brand-50 text-brand-700 ring-brand-100' },
+  'no-data': { icon: PenLine, label: 'Мало данных', cls: 'bg-gray-100 text-ink-soft ring-gray-200' },
 };
+
+export const NO_DATA_MESSAGE =
+  'Пока недостаточно данных для анализа. Добавьте свои первые доходы и расходы, чтобы я мог дать финансовый совет!';
 
 const TIP_ICON = { habit: Repeat, rule: Scale, action: Zap };
 
 function statusSentence(a, goal) {
   const pace = money(a.profile.savings);
   switch (a.status) {
+    case 'no-data':
+      return NO_DATA_MESSAGE;
     case 'done':
       return `Вы накопили все ${money(goal.target)}. Пора поставить следующую цель!`;
     case 'negative':
@@ -56,30 +62,35 @@ export default function AdvisorPanel({ advice, goal }) {
         </span>
         <p className="mt-2.5 text-[15px] leading-snug text-ink">{statusSentence(advice, goal)}</p>
 
-        <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-          {[
-            ['Доходы', money(p.income, { compact: true }), 'text-brand-600'],
-            ['Расходы', money(p.expense, { compact: true }), 'text-ink'],
-            ['Остаётся', money(p.savings, { compact: true, sign: true }), p.savings >= 0 ? 'text-brand-600' : 'text-red-600'],
-          ].map(([k, v, cls]) => (
-            <div key={k} className="rounded-2xl bg-gray-50 px-1 py-2.5">
-              <p className="text-[11px] font-medium text-ink-muted">{k} / мес</p>
-              <p className={`tabular text-[14px] font-bold ${cls}`}>{v}</p>
+        {/* Без данных цифры (0 ₸ / 0 ₸ / 0 ₸) только путают — показываем одно сообщение. */}
+        {advice.status !== 'no-data' && (
+          <>
+            <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+              {[
+                ['Доходы', money(p.income, { compact: true }), 'text-brand-600'],
+                ['Расходы', money(p.expense, { compact: true }), 'text-ink'],
+                ['Остаётся', money(p.savings, { compact: true, sign: true }), p.savings >= 0 ? 'text-brand-600' : 'text-red-600'],
+              ].map(([k, v, cls]) => (
+                <div key={k} className="rounded-2xl bg-gray-50 px-1 py-2.5">
+                  <p className="text-[11px] font-medium text-ink-muted">{k} / мес</p>
+                  <p className={`tabular text-[14px] font-bold ${cls}`}>{v}</p>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-        {advice.status !== 'done' && (
-          <div className="mt-3 flex items-center gap-2.5 rounded-2xl border border-dashed border-gray-200 px-3 py-2.5">
-            <CalendarClock size={18} className="shrink-0 text-ink-muted" />
-            <p className="text-[13px] leading-snug text-ink-soft">
-              Чтобы успеть к сроку, откладывайте <span className="tabular font-bold text-ink">{money(advice.requiredMonthly)} в месяц</span>
-              {p.income > 0 && <span className="text-ink-muted"> · {formatPercent(advice.requiredMonthly / p.income)} дохода</span>}
-            </p>
-          </div>
+            {advice.status !== 'done' && (
+              <div className="mt-3 flex items-center gap-2.5 rounded-2xl border border-dashed border-gray-200 px-3 py-2.5">
+                <CalendarClock size={18} className="shrink-0 text-ink-muted" />
+                <p className="text-[13px] leading-snug text-ink-soft">
+                  Чтобы успеть к сроку, откладывайте <span className="tabular font-bold text-ink">{money(advice.requiredMonthly)} в месяц</span>
+                  {p.income > 0 && <span className="text-ink-muted"> · {formatPercent(advice.requiredMonthly / p.income)} дохода</span>}
+                </p>
+              </div>
+            )}
+          </>
         )}
       </Card>
 
-      {advice.status !== 'done' && <AIAdviceCard goal={goal} />}
+      {advice.status !== 'done' && advice.status !== 'no-data' && <AIAdviceCard goal={goal} />}
 
       {advice.tips.length > 0 && advice.status !== 'done' && (
         <div className="space-y-3">

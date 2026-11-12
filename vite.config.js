@@ -36,7 +36,7 @@ export default defineConfig(({ mode }) => ({
           manifestFilename: 'manifest.json',
           includeAssets: ['icon.svg', 'apple-touch-icon.png', 'favicon-32x32.png'],
           manifest: {
-            name: 'Финансы — Kaspi Gold',
+            name: 'Финансы',
             short_name: 'Финансы',
             description: 'Личные финансы: баланс, аналитика расходов, цели и советник.',
             lang: 'ru',

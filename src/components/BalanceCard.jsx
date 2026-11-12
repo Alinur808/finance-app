@@ -4,7 +4,7 @@ import { formatMoney, groupDigits } from '../utils/format.js';
 import { PERIODS } from '../utils/dates.js';
 
 /**
- * Тёмно-зелёная шапка + золотая карта Kaspi Gold, которая наезжает на её край,
+ * Тёмно-зелёная шапка + золотая карта (название — из Профиля), которая наезжает на её край,
  * и под ней — доходы/расходы за выбранный период.
  */
 export default function BalanceCard({ balance, income, expense, accountName, accountKind }) {

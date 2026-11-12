@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ChevronDown, X } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext.jsx';
 import { PERIODS } from '../utils/dates.js';
-import { ACCOUNTS, getAccount } from '../data/accounts.js';
+import { useAccounts } from '../hooks/useAccounts.js';
 import { categoryList, getCategory } from '../data/categories.js';
 import BottomSheet, { SheetOption } from './BottomSheet.jsx';
 import CategoryIcon from './CategoryIcon.jsx';
@@ -41,6 +41,7 @@ function Chip({ active, onClick, children, dropdown, onClear }) {
  */
 export default function FilterChips({ showCategory = true }) {
   const { filters, setFilters } = useFinance();
+  const { accounts, getAccount } = useAccounts();
   const [sheet, setSheet] = useState(null);
   const close = () => setSheet(null);
   const account = filters.accountId === 'all' ? null : getAccount(filters.accountId);
@@ -73,7 +74,7 @@ export default function FilterChips({ showCategory = true }) {
         <SheetOption selected={filters.accountId === 'all'} onClick={() => { setFilters({ accountId: 'all' }); close(); }}>
           Все счета
         </SheetOption>
-        {ACCOUNTS.map((a) => (
+        {accounts.map((a) => (
           <SheetOption
             key={a.id}
             selected={filters.accountId === a.id}

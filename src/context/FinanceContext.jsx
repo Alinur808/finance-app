@@ -14,6 +14,8 @@ const DEFAULT_SETTINGS = {
   name: import.meta.env.MODE === 'public' ? '' : 'Алинур',
   aiApiKey: '',
   aiProvider: 'anthropic',
+  // своё название карты, например «Kaspi Gold» или «Freedom Super Card»; пусто — «Основная карта»
+  cardName: '',
   // начальные балансы счетов; попадают в резервную копию вместе с операциями
   openings: Object.fromEntries(ACCOUNTS.map((a) => [a.id, a.opening])),
 };

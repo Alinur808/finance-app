@@ -15,7 +15,7 @@ const PUBLIC_TRANSPORT_FARE = 800; // ₸ за поездку на метро/а
 
 /**
  * Средний денежный поток в месяц. Окно — последние 60 дней или меньше,
- * если данных меньше (выписка Kaspi покрывает 32 дня).
+ * если данных меньше (например, выписка за месяц).
  */
 export function monthlyProfile(transactions, now = new Date()) {
   const oldest = transactions.reduce((min, t) => Math.min(min, new Date(t.date).getTime()), now.getTime());
@@ -70,11 +70,19 @@ export function buildAdvice(transactions, goal, now = new Date()) {
   const savingsRate = p.income > 0 ? p.savings / p.income : 0;
   const shortfall = Math.max(0, requiredMonthly - p.savings);
 
+  // Нет ни доходов, ни расходов (новый пользователь или пустой период) — считать нечего.
+  const hasData = p.income > 0 || p.expense > 0;
+
   let status;
   if (remaining === 0) status = 'done';
+  else if (!hasData) status = 'no-data';
   else if (p.savings <= 0) status = 'negative';
   else if (baseWeeks <= weeksLeft) status = 'on-track';
   else status = 'behind';
+
+  if (status === 'no-data') {
+    return { profile: p, remaining, savingsRate, requiredMonthly, shortfall, baseWeeks, weeksLeft, eta, status, tips: [], discretionary: [] };
+  }
 
   const goalLabel = money(goal.target, { compact: true });
   const tips = [];
@@ -155,7 +163,7 @@ export function buildAdvice(transactions, goal, now = new Date()) {
       kind: 'rule',
       categoryId: 'fees',
       title: 'Комиссии за переводы',
-      text: `${plural(fees.length, ['перевод', 'перевода', 'переводов'])} в другие банки стоили ${money(fees.reduce((s, t) => s + t.amount, 0))}. Переводите на Kaspi Gold по номеру телефона — это бесплатно.`,
+      text: `${plural(fees.length, ['перевод', 'перевода', 'переводов'])} в другие банки стоили ${money(fees.reduce((s, t) => s + t.amount, 0))}. Переводите внутри своего банка по номеру телефона — обычно это бесплатно.`,
       monthlyImpact: monthly,
       impactLabel: null,
     });
@@ -184,7 +192,7 @@ export function buildAdvice(transactions, goal, now = new Date()) {
       id: 'autosave',
       kind: 'action',
       title: 'Сначала заплатите себе',
-      text: `Настройте автоперевод ${groupDigits(Math.ceil(requiredMonthly / 1000) * 1000)} ₸ в месяц на Kaspi Депозит сразу после поступления денег — так вы соберёте «${goal.name}» к ${formatFullDate(deadline)}.`,
+      text: `Настройте автоперевод ${groupDigits(Math.ceil(requiredMonthly / 1000) * 1000)} ₸ в месяц на депозит или накопительный счёт сразу после поступления денег — так вы соберёте «${goal.name}» к ${formatFullDate(deadline)}.`,
       monthlyImpact: 0,
       impactLabel: null,
     });
@@ -277,7 +285,7 @@ const MOCK_ADVICE = `🧪 Тестовый режим: это заготовле
 
 1. Сократите доставку еды вдвое — освободится около 48 000 ₸ в месяц, цель приблизится примерно на 10 недель.
 2. Замените половину поездок на такси метро — это ещё около 33 000 ₸ в месяц.
-3. Переводите друзьям на Kaspi по номеру телефона, чтобы не платить комиссию 200 ₸ за перевод.
+3. Переводите друзьям внутри своего банка, чтобы не платить комиссию за перевод в другой банк.
 4. Настройте автоперевод на депозит в день поступления денег — так откладывать проще всего.`;
 
 /** Ждёт `ms` миллисекунд; прерывается, если пользователь ушёл с экрана. */

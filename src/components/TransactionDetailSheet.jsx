@@ -1,5 +1,5 @@
 import { Trash2 } from 'lucide-react';
-import { getAccount } from '../data/accounts.js';
+import { useAccounts } from '../hooks/useAccounts.js';
 import { getCategory } from '../data/categories.js';
 import { formatShortDate, formatTime } from '../utils/dates.js';
 import { formatOriginal, formatTxAmount } from '../utils/format.js';
@@ -7,6 +7,7 @@ import BottomSheet from './BottomSheet.jsx';
 import CategoryIcon from './CategoryIcon.jsx';
 
 export default function TransactionDetailSheet({ tx, onClose, onDelete }) {
+  const { getAccount } = useAccounts();
   if (!tx) return null;
   const cat = getCategory(tx.categoryId);
   const acc = getAccount(tx.accountId);
@@ -33,7 +34,7 @@ export default function TransactionDetailSheet({ tx, onClose, onDelete }) {
           </div>
         ))}
       </dl>
-      {tx.noTime && <p className="mt-3 px-1 text-[12px] text-ink-muted">Операция из выписки Kaspi Gold — время в выписке не указано.</p>}
+      {tx.noTime && <p className="mt-3 px-1 text-[12px] text-ink-muted">Операция из банковской выписки — время в выписке не указано.</p>}
       <button
         onClick={() => onDelete(tx.id)}
         className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-red-50 font-semibold text-red-600 active:bg-red-100"

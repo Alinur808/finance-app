@@ -1,11 +1,12 @@
 import { getCategory } from '../data/categories.js';
-import { getAccount } from '../data/accounts.js';
+import { useAccounts } from '../hooks/useAccounts.js';
 import { formatGroupLabel, formatTime } from '../utils/dates.js';
 import { formatMoney, formatOriginal, formatTxAmount } from '../utils/format.js';
 import { groupByDay } from '../utils/analytics.js';
 import CategoryIcon from './CategoryIcon.jsx';
 
 export function TransactionRow({ tx, onClick }) {
+  const { getAccount } = useAccounts();
   const cat = getCategory(tx.categoryId);
   const income = tx.type === 'income';
   const meta = tx.original ? formatOriginal(tx.original) : tx.noTime ? '' : formatTime(tx.date);

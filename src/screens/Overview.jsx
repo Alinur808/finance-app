@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { ChevronRight, Receipt, Sparkles } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext.jsx';
-import { ACCOUNTS, getAccount } from '../data/accounts.js';
+import { ACCOUNTS } from '../data/accounts.js';
+import { useAccounts } from '../hooks/useAccounts.js';
 import { accountBalances, filterTransactions, spendingByCategory, totals } from '../utils/analytics.js';
 import { buildAdvice } from '../utils/advisor.js';
 import { formatMoney, plural } from '../utils/format.js';
@@ -18,6 +19,7 @@ const TX_WORDS = ['операция', 'операции', 'операций'];
 
 export default function Overview({ now, onSelectTx, onNavigate, onAdd, toast }) {
   const { transactions, filters, setFilters, goals, activeGoalId, settings } = useFinance();
+  const { getAccount } = useAccounts();
   const [days, setDays] = useState(PAGE_DAYS);
   const [showFx, setShowFx] = useState(false);
 
@@ -26,7 +28,7 @@ export default function Overview({ now, onSelectTx, onNavigate, onAdd, toast }) 
   const breakdown = useMemo(() => spendingByCategory(filtered).filter((c) => c.id !== 'fx'), [filtered]);
   const balances = useMemo(() => accountBalances(transactions, ACCOUNTS, settings.openings), [transactions, settings.openings]);
 
-  // Карта показывает выбранный счёт; при «Все счета» — Kaspi Gold.
+  // Карта показывает выбранный счёт; при «Все счета» — основную карту.
   const card = getAccount(filters.accountId === 'all' ? 'kaspi' : filters.accountId);
   const total = Object.values(balances).reduce((a, b) => a + b, 0);
 

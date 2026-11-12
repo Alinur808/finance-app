@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Download, Eye, EyeOff, FileUp, KeyRound, RotateCcw, ShieldAlert, Wallet } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext.jsx';
-import { ACCOUNTS } from '../data/accounts.js';
+import { ACCOUNTS, DEFAULT_CARD_NAME } from '../data/accounts.js';
+import { useAccounts } from '../hooks/useAccounts.js';
 import { STATEMENT_PERIOD } from '../data/seed.js';
 import { accountBalances } from '../utils/analytics.js';
 import { AI_PROVIDERS, detectProvider } from '../utils/advisor.js';
@@ -30,6 +31,7 @@ function Toggle({ on, onChange, label }) {
 export default function Profile({ toast }) {
   const state = useFinance();
   const { transactions, settings, updateSettings, reset, goals } = state;
+  const { accounts } = useAccounts();
   const balances = useMemo(() => accountBalances(transactions, ACCOUNTS, settings.openings), [transactions, settings.openings]);
   const total = Object.values(balances).reduce((a, b) => a + b, 0);
 
@@ -76,7 +78,7 @@ export default function Profile({ toast }) {
         <section>
           <SectionHeader title="Счета" action={settings.hideBalance ? '••••' : formatMoney(total)} />
           <Card className="divide-y divide-gray-100 overflow-hidden">
-            {ACCOUNTS.map((a) => (
+            {accounts.map((a) => (
               <div key={a.id} className="flex items-center gap-3 px-4 py-3.5">
                 <span className="grid h-11 w-11 place-items-center rounded-full" style={{ backgroundColor: `${a.color}26`, color: a.color }}>
                   <a.icon size={20} />
@@ -88,10 +90,22 @@ export default function Profile({ toast }) {
                 <p className="tabular font-bold">{settings.hideBalance ? '••••' : formatMoney(balances[a.id], { decimals: true })}</p>
               </div>
             ))}
+            <label htmlFor="card-name" className="flex items-center gap-3 px-4 py-3">
+              <span className="flex-1 text-[14px] font-medium text-ink-soft">Название карты</span>
+              <input
+                id="card-name"
+                value={settings.cardName}
+                maxLength={40}
+                autoComplete="off"
+                placeholder={DEFAULT_CARD_NAME}
+                onChange={(e) => updateSettings({ cardName: e.target.value })}
+                className="h-10 w-44 rounded-xl bg-gray-100 px-3 text-right text-[14px] font-semibold outline-none placeholder:font-normal placeholder:text-ink-muted focus:ring-2 focus:ring-brand-500"
+              />
+            </label>
           </Card>
           {STATEMENT_PERIOD && (
           <p className="mt-2 px-1 text-[12px] text-ink-muted">
-            Операции Kaspi Gold загружены из выписки за {formatFullDate(`${STATEMENT_PERIOD.from}T12:00`)} – {formatFullDate(`${STATEMENT_PERIOD.to}T12:00`)}.
+            Операции загружены из банковской выписки за {formatFullDate(`${STATEMENT_PERIOD.from}T12:00`)} – {formatFullDate(`${STATEMENT_PERIOD.to}T12:00`)}.
           </p>
           )}
         </section>

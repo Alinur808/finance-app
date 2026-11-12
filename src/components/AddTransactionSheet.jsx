@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ACCOUNTS } from '../data/accounts.js';
+import { useAccounts } from '../hooks/useAccounts.js';
 import { categoryList } from '../data/categories.js';
 import { addDays, dayKey } from '../utils/dates.js';
 import { groupDigits } from '../utils/format.js';
@@ -11,6 +11,7 @@ const blank = () => ({ type: 'expense', amount: '', categoryId: null, merchant: 
 
 /** Add-transaction flow: type → amount → category → details → save. */
 export default function AddTransactionSheet({ open, onClose, onSave }) {
+  const { accounts } = useAccounts();
   const [form, setForm] = useState(blank);
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
 
@@ -101,7 +102,7 @@ export default function AddTransactionSheet({ open, onClose, onSave }) {
 
       <p className="mb-2 mt-5 text-sm font-semibold text-ink-soft">Счёт</p>
       <div className="no-scrollbar -mx-5 flex gap-2 overflow-x-auto px-5">
-        {ACCOUNTS.map((a) => (
+        {accounts.map((a) => (
           <button
             key={a.id}
             onClick={() => set({ accountId: a.id })}
