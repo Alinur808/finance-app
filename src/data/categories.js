@@ -13,6 +13,7 @@ import {
   Wallet,
   Briefcase,
   RotateCcw,
+  ArrowRightLeft,
 } from 'lucide-react';
 
 /**
@@ -24,6 +25,8 @@ import {
  *    после «на», «за», «тратите»: «тратите на доставку еды»
  *  - discretionary: расходы, которые Советник может предложить сократить
  *  - system: служебные категории, не показываются при ручном добавлении
+ *  - internal: перемещение денег между своими счетами — влияет на баланс,
+ *    но не считается ни доходом, ни расходом (аналитика и советник его не видят)
  */
 export const CATEGORIES = {
   delivery: { id: 'delivery', name: 'Доставка еды', nameAcc: 'доставку еды', short: 'Доставка', type: 'expense', icon: Bike, color: '#eb6834', bg: '#fde9dd', ink: '#c4521f', discretionary: true },
@@ -36,6 +39,7 @@ export const CATEGORIES = {
   shopping: { id: 'shopping', name: 'Покупки', nameAcc: 'покупки', short: 'Покупки', type: 'expense', icon: ShoppingBag, color: '#008300', bg: '#e4f1e0', ink: '#2f7a2f', discretionary: true },
   fees: { id: 'fees', name: 'Комиссии', nameAcc: 'комиссии', short: 'Комиссии', type: 'expense', icon: Receipt, color: '#a8a29e', bg: '#efeeec', ink: '#6b6762', discretionary: false },
   cash: { id: 'cash', name: 'Снятие наличных', nameAcc: 'снятие наличных', short: 'Наличные', type: 'expense', icon: Banknote, color: '#a8a29e', bg: '#efeeec', ink: '#6b6762', discretionary: false, system: true },
+  own: { id: 'own', name: 'Между своими счетами', nameAcc: 'переводы между своими счетами', short: 'Свои счета', type: 'any', icon: ArrowRightLeft, color: '#c4c0b8', bg: '#eef0f3', ink: '#5b6472', discretionary: false, system: true, internal: true },
   fx: { id: 'fx', name: 'Курсовая разница', nameAcc: 'курсовую разницу', short: 'Курс', type: 'any', icon: ArrowUpDown, color: '#c4c0b8', bg: '#f1f0ec', ink: '#8a857c', discretionary: false, system: true },
 
   topup: { id: 'topup', name: 'Пополнения', nameAcc: 'пополнения', short: 'Пополнения', type: 'income', icon: Wallet, color: '#0f8a5a', bg: '#e1f3e8', ink: '#0f7a50' },

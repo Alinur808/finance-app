@@ -9,7 +9,9 @@ export function TransactionRow({ tx, onClick }) {
   const { getAccount } = useAccounts();
   const cat = getCategory(tx.categoryId);
   const income = tx.type === 'income';
-  const meta = tx.original ? formatOriginal(tx.original) : tx.noTime ? '' : formatTime(tx.date);
+  const meta = [tx.original ? formatOriginal(tx.original) : tx.noTime ? '' : formatTime(tx.date), tx.pending ? 'в обработке' : '']
+    .filter(Boolean)
+    .join(' · ');
   return (
     <button onClick={() => onClick?.(tx)} className="flex w-full items-center gap-3 px-4 py-3 text-left transition active:bg-gray-50">
       <CategoryIcon categoryId={tx.categoryId} />

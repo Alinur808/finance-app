@@ -27,7 +27,7 @@ export default function EmptyDashboard({ name, onAdd, toast }) {
           Загрузите свои данные
         </h2>
         <p className="mt-2 max-w-[300px] text-[15px] leading-snug text-ink-soft">
-          Выберите файл резервной копии (JSON), сохранённый через «Экспорт данных», — и здесь появятся баланс, операции и аналитика.
+          Выберите PDF-выписку Freedom Bank или резервную копию (JSON) — и здесь появятся баланс, операции и аналитика.
         </p>
 
         <button
@@ -36,7 +36,7 @@ export default function EmptyDashboard({ name, onAdd, toast }) {
           className="mt-7 flex h-14 w-full max-w-[300px] items-center justify-center gap-2 rounded-2xl bg-brand-600 text-[16px] font-semibold text-white shadow-float transition active:scale-[0.98] disabled:opacity-70"
         >
           {busy ? <Loader2 size={20} className="animate-spin" /> : <FileUp size={20} />}
-          Импорт данных
+          {busy === 'parsing-pdf' ? 'Читаю выписку…' : 'Импорт данных'}
         </button>
         <input id="empty-import-file" {...inputProps} />
 
@@ -48,7 +48,7 @@ export default function EmptyDashboard({ name, onAdd, toast }) {
 
         <p className="mt-8 flex max-w-[300px] items-start gap-2 text-left text-[12px] leading-snug text-ink-muted">
           <ShieldCheck size={15} className="mt-0.5 shrink-0" />
-          Файл читается прямо на телефоне и никуда не отправляется. Данные хранятся только в этом браузере.
+          Файл, в том числе PDF-выписка, читается прямо в браузере на вашем устройстве и никуда не отправляется. Данные хранятся только в этом браузере.
         </p>
       </div>
     </div>

@@ -54,7 +54,8 @@ export default defineConfig(({ mode }) => ({
             ],
           },
           workbox: {
-            globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+            globPatterns: ['**/*.{js,mjs,css,html,svg,png,woff2}'],
+            maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, // воркер pdf.js ~1,3 МБ
             navigateFallback: 'index.html',
             runtimeCaching: [
               {

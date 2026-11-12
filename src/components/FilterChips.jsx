@@ -98,7 +98,7 @@ export default function FilterChips({ showCategory = true }) {
         {['expense', 'income'].map((type) => (
           <div key={type}>
             <p className="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wider text-ink-muted">{type === 'expense' ? 'Расходы' : 'Доходы'}</p>
-            {[...categoryList(type), ...(type === 'expense' ? [getCategory('fx')] : [])].map((c) => (
+            {[...categoryList(type), ...(type === 'expense' ? [getCategory('own'), getCategory('fx')] : [])].map((c) => (
               <SheetOption
                 key={c.id}
                 selected={filters.categoryId === c.id}

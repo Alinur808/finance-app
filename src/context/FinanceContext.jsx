@@ -1,7 +1,8 @@
 import { createContext, useContext, useEffect, useMemo, useReducer, useState } from 'react';
 import { defaultGoals, statementTransactions } from '../data/seed.js';
 import { ACCOUNTS } from '../data/accounts.js';
-import { DEFAULT_PLAN } from '../utils/plan.js';
+import { createEmptyPlan } from '../utils/plan.js';
+import { dayKey } from '../utils/dates.js';
 
 const STORAGE_KEY = 'tenge-finance.v2';
 const FinanceContext = createContext(null);
@@ -29,7 +30,7 @@ function freshState() {
     activeGoalId: goals[0].id,
     filters: DEFAULT_FILTERS,
     settings: DEFAULT_SETTINGS,
-    plan: DEFAULT_PLAN, // «Финансовый дневник»: дедлайн, цели-покупки, регулярные поступления
+    plan: createEmptyPlan(now), // «Финансовый дневник»: дедлайн, цели-покупки, регулярные поступления
   };
 }
 
@@ -39,7 +40,7 @@ function loadState() {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed.transactions)) {
-        return { ...freshState(), ...parsed, settings: { ...DEFAULT_SETTINGS, ...parsed.settings }, plan: parsed.plan ?? DEFAULT_PLAN, filters: DEFAULT_FILTERS };
+        return { ...freshState(), ...parsed, settings: { ...DEFAULT_SETTINGS, ...parsed.settings }, plan: parsed.plan ?? createEmptyPlan(), filters: DEFAULT_FILTERS };
       }
     }
   } catch {
@@ -91,6 +92,25 @@ function reducer(state, action) {
         plan: action.data.plan ?? state.plan,
         filters: DEFAULT_FILTERS,
       };
+    case 'importStatement': {
+      // Операции основной карты за период выписки заменяем данными выписки,
+      // всё остальное (наличные, другие месяцы, цели, план) оставляем.
+      const { transactions: incoming, period, closingBalance, cardName } = action.data;
+      const inPeriod = (t) => t.accountId === 'kaspi' && dayKey(t.date) >= period.from && dayKey(t.date) <= period.to;
+      const transactions = [...state.transactions.filter((t) => !inPeriod(t)), ...incoming].sort((a, b) => new Date(b.date) - new Date(a.date));
+      // начальный остаток подбираем так, чтобы баланс карты совпал с выпиской
+      const net = transactions.filter((t) => t.accountId === 'kaspi').reduce((s, t) => s + (t.type === 'income' ? t.amount : -t.amount), 0);
+      return {
+        ...state,
+        transactions,
+        settings: {
+          ...state.settings,
+          openings: { ...state.settings.openings, kaspi: Math.round((closingBalance - net) * 100) / 100 },
+          cardName: state.settings.cardName?.trim() ? state.settings.cardName : cardName,
+        },
+        filters: DEFAULT_FILTERS,
+      };
+    }
     case 'savePlan':
       return { ...state, plan: action.plan };
     case 'togglePlanItemPaid':
@@ -131,6 +151,7 @@ export function FinanceProvider({ children }) {
       setActiveGoal: (id) => dispatch({ type: 'setActiveGoal', id }),
       updateSettings: (patch) => dispatch({ type: 'updateSettings', patch }),
       importData: (data) => dispatch({ type: 'importData', data }),
+      importStatement: (data) => dispatch({ type: 'importStatement', data }),
       savePlan: (plan) => dispatch({ type: 'savePlan', plan }),
       togglePlanItemPaid: (id, day) => dispatch({ type: 'togglePlanItemPaid', id, day }),
       reset: () => dispatch({ type: 'reset' }),

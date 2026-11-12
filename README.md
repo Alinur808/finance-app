@@ -21,6 +21,14 @@ The script `scripts/parse_kaspi_statement.py` needs `pdftotext` (poppler-utils).
 
 **`src/data/statement.json` contains your bank data.** It holds your transactions and the names of people you sent money to or received money from, so it is listed in `.gitignore` and never goes to GitHub. When the file is missing (on GitHub Actions, or in a fresh clone), every build uses an empty statement instead.
 
+## Importing a Freedom Bank statement (PDF)
+In **Профиль → Импорт данных** (or on the empty start screen) you can choose a Freedom Bank Kazakhstan card statement (Super Card) as a PDF. It is parsed entirely in the browser with pdf.js (`src/utils/freedomParser.js`), and the file is never uploaded anywhere.
+
+- Rows are read by their position on the page, which handles details that wrap above and below the date line and rows split across two pages.
+- AED amounts are converted to tenge using the rates printed in the statement itself ("Между своими счетами по курсу …"). USD uses the AED rate × 3.6725, since the dirham is pegged to the dollar. The original amount is kept and shown next to each transaction.
+- Moves between your own accounts and deposits get the internal category "Между своими счетами". They change the balance but don't count as income or spending.
+- Importing replaces the main card's transactions for the statement's period and sets the balance to the statement's closing balance. Cash, other months, goals and the plan are kept, so importing the same statement twice creates no duplicates.
+
 ## Deploying to GitHub Pages
 GitHub Pages only serves ready-made files and can't run Vite. The workflow in `.github/workflows/deploy.yml` builds the app on every push to `main` and publishes `dist/`.
 

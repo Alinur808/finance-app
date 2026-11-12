@@ -2,22 +2,17 @@ import { isSameDay, startOfDay } from './dates.js';
 import { daysBetween, occurrences, parseLocalDate } from './schedule.js';
 
 /**
- * План «Финансового дневника» по умолчанию. Хранится в состоянии приложения
- * (ключ `plan`), поэтому сохраняется в localStorage и попадает в экспорт JSON.
+ * Пустой план «Финансового дневника» для нового пользователя: дедлайн —
+ * последний день текущего месяца, без целей и поступлений (их задают в
+ * редакторе плана). Хранится в состоянии приложения (ключ `plan`), поэтому
+ * сохраняется в localStorage и попадает в экспорт JSON.
  * Даты — строки "ГГГГ-ММ-ДД", чтобы не зависеть от часового пояса.
  */
-export const DEFAULT_PLAN = {
-  deadline: '2026-12-14',
-  items: [
-    { id: 'item-1', name: 'Покупка 1', amount: 217000, paidOn: null },
-    { id: 'item-2', name: 'Покупка 2', amount: 60000, paidOn: null },
-    { id: 'item-party', name: 'Мероприятие / вечеринка', amount: 200000, paidOn: null },
-  ],
-  incomes: [
-    { id: 'inc-sunday', name: 'Поступление по воскресеньям', amount: 60000, rule: { type: 'weekly', weekday: 0 } },
-    { id: 'inc-5th', name: 'Поступление 5-го числа', amount: 60000, rule: { type: 'monthly', day: 5 } },
-  ],
-};
+export function createEmptyPlan(now = new Date()) {
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const deadline = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}`;
+  return { deadline, items: [], incomes: [] };
+}
 
 /**
  * Прогноз к дедлайну.
@@ -31,7 +26,7 @@ export const DEFAULT_PLAN = {
  * сегодня входит, день дедлайна — нет (в этот день деньги уже нужны на цели).
  *
  * @param {object}   args
- * @param {object}   args.plan          состояние plan (см. DEFAULT_PLAN)
+ * @param {object}   args.plan          состояние plan (см. createEmptyPlan)
  * @param {number}   args.balance       текущий баланс всех счетов, ₸
  * @param {object[]} args.transactions  операции (для «потрачено сегодня»)
  * @param {Date}     [args.now]
@@ -63,7 +58,7 @@ export function buildPlanForecast({ plan, balance, transactions = [], now = new 
 
   // 4. Дневник на сегодня. Покупки целей, отмеченные сегодня, не считаем «тратами дня».
   const spentRaw = transactions
-    .filter((t) => t.type === 'expense' && t.categoryId !== 'fx' && isSameDay(t.date, today))
+    .filter((t) => t.type === 'expense' && t.categoryId !== 'fx' && t.categoryId !== 'own' && isSameDay(t.date, today))
     .reduce((s, t) => s + t.amount, 0);
   const paidGoalsToday = plan.items.filter((i) => i.paidOn && isSameDay(parseLocalDate(i.paidOn), today)).reduce((s, i) => s + i.amount, 0);
   const spentToday = Math.max(0, spentRaw - paidGoalsToday);

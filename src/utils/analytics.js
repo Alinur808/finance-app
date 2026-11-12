@@ -17,10 +17,14 @@ export function filterTransactions(transactions, filters, now = new Date()) {
   );
 }
 
+/** Перевод между своими счетами — не доход и не расход. */
+export const isInternal = (tx) => Boolean(getCategory(tx.categoryId).internal);
+
 export function totals(transactions) {
   let income = 0;
   let expense = 0;
   for (const tx of transactions) {
+    if (isInternal(tx)) continue;
     if (tx.type === 'income') income += tx.amount;
     else expense += tx.amount;
   }
@@ -48,7 +52,7 @@ export function spendingByCategory(transactions) {
   const byId = new Map();
   let total = 0;
   for (const tx of transactions) {
-    if (tx.type !== 'expense') continue;
+    if (tx.type !== 'expense' || isInternal(tx)) continue;
     total += tx.amount;
     const row = byId.get(tx.categoryId) ?? { id: tx.categoryId, category: getCategory(tx.categoryId), amount: 0, count: 0 };
     row.amount += tx.amount;
@@ -93,7 +97,7 @@ export function spendingSeries(transactions, start, end) {
     buckets.push({ start: d, end: addDays(d, step), amount: 0, weekly });
   }
   for (const tx of transactions) {
-    if (tx.type !== 'expense') continue;
+    if (tx.type !== 'expense' || isInternal(tx)) continue;
     const t = new Date(tx.date);
     const i = Math.floor((startOfDay(t) - s) / (86400000 * step));
     if (buckets[i]) buckets[i].amount += tx.amount;

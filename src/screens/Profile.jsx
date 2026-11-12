@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Download, Eye, EyeOff, FileUp, KeyRound, RotateCcw, ShieldAlert, Wallet } from 'lucide-react';
+import { Download, Eye, EyeOff, FileUp, KeyRound, Loader2, RotateCcw, ShieldAlert, ShieldCheck, Wallet } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext.jsx';
 import { ACCOUNTS, DEFAULT_CARD_NAME } from '../data/accounts.js';
 import { useAccounts } from '../hooks/useAccounts.js';
@@ -8,6 +8,7 @@ import { accountBalances } from '../utils/analytics.js';
 import { AI_PROVIDERS, detectProvider } from '../utils/advisor.js';
 import { downloadBackup } from '../utils/backup.js';
 import { useBackupImport } from '../hooks/useBackupImport.js';
+import ImportConfirm from '../components/ImportConfirm.jsx';
 import { formatFullDate } from '../utils/dates.js';
 import { formatMoney, groupDigits, plural } from '../utils/format.js';
 import { Card, ScreenHeader, SectionHeader } from '../components/ui.jsx';
@@ -115,6 +116,7 @@ export default function Profile({ toast }) {
           <Card className="space-y-3 p-4">
             <p className="text-[13px] leading-snug text-ink-muted">
               Данные хранятся только в этом браузере. Сохраняйте копию, чтобы не потерять операции при очистке хранилища.
+              Импортировать можно JSON-копию или PDF-выписку Freedom Bank.
             </p>
             <div className="grid gap-2">
               <button onClick={onExport} className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-brand-600 text-sm font-semibold text-white active:bg-brand-700">
@@ -122,30 +124,20 @@ export default function Profile({ toast }) {
               </button>
               <button
                 onClick={backupImport.openPicker}
-                className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-gray-100 text-sm font-semibold text-ink active:bg-gray-200"
+                disabled={Boolean(backupImport.busy)}
+                className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-gray-100 text-sm font-semibold text-ink active:bg-gray-200 disabled:opacity-70"
               >
-                <FileUp size={17} /> Импорт данных
+                {backupImport.busy ? <Loader2 size={17} className="animate-spin" /> : <FileUp size={17} />}
+                {backupImport.busy === 'parsing-pdf' ? 'Читаю выписку…' : 'Импорт данных (JSON или PDF)'}
               </button>
             </div>
             <input id="import-file" {...backupImport.inputProps} />
             {backupImport.error && <p className="rounded-xl bg-red-50 px-3 py-2 text-[13px] text-red-700">{backupImport.error}</p>}
-            {backupImport.pending && (
-              <div className="rounded-2xl bg-amber-50 p-3 ring-1 ring-amber-100">
-                <p className="text-[13px] leading-snug text-amber-900">
-                  В файле {plural(backupImport.pending.transactions.length, TX_WORDS)}
-                  {backupImport.pending.goals ? ` и ${plural(backupImport.pending.goals.length, ['цель', 'цели', 'целей'])}` : ''}
-                  {backupImport.pending.exportedAt ? ` от ${formatFullDate(backupImport.pending.exportedAt)}` : ''}. Текущие данные будут заменены.
-                </p>
-                <div className="mt-2.5 flex gap-2">
-                  <button onClick={backupImport.confirm} className="h-10 flex-1 rounded-xl bg-amber-500 text-sm font-semibold text-white active:bg-amber-600">
-                    Заменить данные
-                  </button>
-                  <button onClick={backupImport.cancel} className="h-10 flex-1 rounded-xl bg-white text-sm font-semibold text-ink-soft">
-                    Отмена
-                  </button>
-                </div>
-              </div>
-            )}
+            {backupImport.pending && <ImportConfirm pending={backupImport.pending} onConfirm={backupImport.confirm} onCancel={backupImport.cancel} />}
+            <p className="flex gap-2 text-[12px] leading-snug text-ink-muted">
+              <ShieldCheck size={15} className="mt-0.5 shrink-0 text-brand-600" />
+              PDF-выписка читается прямо в браузере на вашем устройстве. Файл никуда не отправляется — ни на сервер, ни нам, ни в ИИ.
+            </p>
           </Card>
         </section>
 

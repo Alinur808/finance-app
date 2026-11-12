@@ -244,7 +244,7 @@ export function buildLLMPayload(transactions, goal, now = new Date()) {
       })),
     },
     transactions: p.recent
-      .filter((t) => t.categoryId !== 'fx')
+      .filter((t) => t.categoryId !== 'fx' && t.categoryId !== 'own')
       .map((t) => ({
         date: t.date.slice(0, 10),
         type: t.type,

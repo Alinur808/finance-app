@@ -1,35 +1,43 @@
 import { useCallback, useRef, useState } from 'react';
 import { useFinance } from '../context/FinanceContext.jsx';
-import { readBackup } from '../utils/backup.js';
+import { readImportFile } from '../utils/backup.js';
 import { plural } from '../utils/format.js';
 
 const TX_WORDS = ['операция', 'операции', 'операций'];
 
 /**
  * Общая логика «Импорт данных» для Профиля и пустого дашборда.
+ * Принимает JSON-копию приложения и PDF-выписку Freedom Bank.
  *
  * - openPicker()  открывает системный выбор файла
  * - inputProps    раздайте скрытому <input type="file" {...inputProps} />
- * - pending       проверенный файл, ждёт подтверждения (если autoConfirm = false)
+ * - pending       проверенный файл, ждёт подтверждения (если autoConfirm = false):
+ *                 { kind: 'backup' | 'statement', transactions, … }
+ * - busy          'reading' | 'parsing-pdf' | null — для индикатора
  * - error         текст ошибки чтения/проверки
  *
  * autoConfirm: true — импортировать сразу, без вопроса «заменить данные?»
  * (используется, когда данных ещё нет и заменять нечего).
  */
 export function useBackupImport({ toast, autoConfirm = false } = {}) {
-  const { importData } = useFinance();
+  const { importData, importStatement } = useFinance();
   const inputRef = useRef(null);
   const [pending, setPending] = useState(null);
   const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(null);
 
   const apply = useCallback(
     (data) => {
-      importData(data);
+      if (data.kind === 'statement') {
+        importStatement(data);
+        toast?.(`Выписка загружена: ${plural(data.transactions.length, TX_WORDS)}`);
+      } else {
+        importData(data);
+        toast?.(`Импортировано: ${plural(data.transactions.length, TX_WORDS)}`);
+      }
       setPending(null);
-      toast?.(`Импортировано: ${plural(data.transactions.length, TX_WORDS)}`);
     },
-    [importData, toast],
+    [importData, importStatement, toast],
   );
 
   const onChange = useCallback(
@@ -38,16 +46,16 @@ export function useBackupImport({ toast, autoConfirm = false } = {}) {
       e.target.value = ''; // чтобы можно было выбрать тот же файл ещё раз
       if (!file) return;
       setError('');
-      setBusy(true);
+      setBusy(/\.pdf$/i.test(file.name) || file.type === 'application/pdf' ? 'parsing-pdf' : 'reading');
       try {
-        const data = await readBackup(file);
+        const data = await readImportFile(file);
         if (autoConfirm) apply(data);
         else setPending(data);
       } catch (err) {
         setPending(null);
         setError(err.message);
       } finally {
-        setBusy(false);
+        setBusy(null);
       }
     },
     [autoConfirm, apply],
@@ -55,7 +63,13 @@ export function useBackupImport({ toast, autoConfirm = false } = {}) {
 
   return {
     openPicker: () => inputRef.current?.click(),
-    inputProps: { ref: inputRef, type: 'file', accept: 'application/json,.json', className: 'hidden', onChange },
+    inputProps: {
+      ref: inputRef,
+      type: 'file',
+      accept: '.json,.pdf,application/json,application/pdf',
+      className: 'hidden',
+      onChange,
+    },
     pending,
     error,
     busy,

@@ -34,6 +34,7 @@ export default function TransactionDetailSheet({ tx, onClose, onDelete }) {
           </div>
         ))}
       </dl>
+      {tx.note && tx.source === 'freedom-pdf' && <p className="mt-3 rounded-2xl bg-gray-50 px-4 py-3 text-[13px] leading-snug text-ink-soft">{tx.note}</p>}
       {tx.noTime && <p className="mt-3 px-1 text-[12px] text-ink-muted">Операция из банковской выписки — время в выписке не указано.</p>}
       <button
         onClick={() => onDelete(tx.id)}

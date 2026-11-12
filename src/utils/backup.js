@@ -46,13 +46,28 @@ const isTx = (t) =>
   typeof t.categoryId === 'string' &&
   !Number.isNaN(new Date(t.date).getTime());
 
+const isPdf = async (file) =>
+  file.type === 'application/pdf' || /\.pdf$/i.test(file.name) || (await file.slice(0, 5).text()) === '%PDF-';
+
+/**
+ * Любой поддерживаемый файл: JSON-копия → { kind: 'backup', … },
+ * PDF-выписка Freedom Bank → { kind: 'statement', … } (разбор в браузере).
+ */
+export async function readImportFile(file) {
+  if (await isPdf(file)) {
+    const { readFreedomPdf } = await import('./pdfImport.js');
+    return { kind: 'statement', ...(await readFreedomPdf(file)) };
+  }
+  return { kind: 'backup', ...(await readBackup(file)) };
+}
+
 /** Читает и проверяет файл. Бросает Error с понятным текстом на русском. */
 export async function readBackup(file) {
   let data;
   try {
     data = JSON.parse(await file.text());
   } catch {
-    throw new Error('Файл не похож на JSON. Выберите файл, сохранённый через «Экспорт данных».');
+    throw new Error('Файл не похож ни на JSON-копию, ни на PDF-выписку. Выберите файл, сохранённый через «Экспорт данных», или выписку Freedom Bank.');
   }
   if (!Array.isArray(data?.transactions)) throw new Error('В файле нет списка операций.');
   const bad = data.transactions.filter((t) => !isTx(t)).length;
