@@ -1,5 +1,6 @@
 import { FileUp, Loader2, Plus, ShieldCheck } from 'lucide-react';
 import { useBackupImport } from '../hooks/useBackupImport.js';
+import ImportErrorBox from './ImportErrorBox.jsx';
 
 /**
  * Обзор, когда операций ещё нет (например, первый запуск публичной сборки
@@ -40,7 +41,7 @@ export default function EmptyDashboard({ name, onAdd, toast }) {
         </button>
         <input id="empty-import-file" {...inputProps} />
 
-        {error && <p className="mt-3 max-w-[300px] rounded-xl bg-red-50 px-3 py-2 text-[13px] text-red-700">{error}</p>}
+        <ImportErrorBox error={error} className="mt-3 w-full max-w-[320px]" />
 
         <button onClick={onAdd} className="mt-3 flex h-11 items-center gap-1.5 px-4 text-[14px] font-semibold text-brand-700 active:opacity-60">
           <Plus size={17} /> Или добавить операцию вручную

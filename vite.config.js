@@ -23,6 +23,8 @@ const EMPTY_STATEMENT = fileURLToPath(new URL('./src/data/statement.empty.json',
  */
 export default defineConfig(({ mode }) => ({
   base: './',
+  // воркер pdf.js собирается как классический (iife) .js — без требований к module-воркерам
+  worker: { format: 'iife' },
   resolve: {
     alias: mode === 'public' || !existsSync(STATEMENT) ? [{ find: /^\.\/statement\.json$/, replacement: EMPTY_STATEMENT }] : [],
   },

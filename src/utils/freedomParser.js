@@ -29,19 +29,112 @@ const AED_PER_USD = 3.6725; // официальная привязка дирх�
 export const FALLBACK_RATES = { AED: 125, USD: 125 * AED_PER_USD, EUR: 540, RUB: 5.5 };
 
 /* ------------------------------------------------------------------ */
+/* 0. Ошибки импорта                                                   */
+/* ------------------------------------------------------------------ */
+
+/** Понятная ошибка формата выписки (не та выписка, нет операций) — показываем как есть. */
+export class StatementFormatError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'StatementFormatError';
+  }
+}
+
+/**
+ * Ошибка для интерфейса: message — понятный текст по-русски,
+ * details — точная техническая причина (имя/текст исходной ошибки, этап),
+ * чтобы её можно было увидеть и скопировать прямо на телефоне.
+ */
+export class ImportError extends Error {
+  constructor(message, { details = '', cause } = {}) {
+    super(message, cause ? { cause } : undefined);
+    this.name = 'ImportError';
+    this.details = details;
+  }
+}
+
+/** Этапы чтения PDF — для текста ошибки. */
+export const PDF_STAGES = {
+  'loading-modules': 'загрузка модуля чтения PDF',
+  'starting-worker': 'запуск модуля чтения PDF (worker)',
+  'reading-file': 'чтение файла с устройства',
+  opening: 'открытие PDF',
+  'extracting-text': 'извлечение текста',
+  parsing: 'разбор операций выписки',
+};
+
+export const PASSWORD_MESSAGE =
+  'Файл защищен паролем. Пожалуйста, снимите пароль с PDF (или скачайте выписку из приложения, а не из почты) и попробуйте снова.';
+
+/** Точная техническая строка исходной ошибки: «Имя: текст». */
+export function rawErrorText(error) {
+  if (!error) return 'неизвестная ошибка';
+  if (typeof error === 'string') return error;
+  const name = error.name && error.name !== 'Error' ? `${error.name}: ` : '';
+  const message = error.message || (error.type ? `событие ${error.type}` : String(error));
+  return `${name}${message}`;
+}
+
+/**
+ * Превращает любую ошибку импорта PDF в ImportError с понятным текстом
+ * и точной причиной. stage — ключ из PDF_STAGES (где именно упало).
+ */
+export function describePdfError(error, stage, extra = {}) {
+  if (error instanceof ImportError) return error;
+  const raw = rawErrorText(error);
+  const stageText = PDF_STAGES[stage] ?? stage ?? 'неизвестный этап';
+  const details = [
+    `Этап: ${stageText}`,
+    `Ошибка: ${raw}`,
+    extra.page ? `Страница: ${extra.page}` : '',
+    extra.pdfjsVersion ? `pdf.js: ${extra.pdfjsVersion}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+  const wrap = (message) => new ImportError(message, { details, cause: error });
+
+  if (error?.name === 'StatementFormatError') return wrap(error.message);
+  if (error?.name === 'PasswordException' || /password/i.test(error?.message ?? '')) return wrap(PASSWORD_MESSAGE);
+  if (error?.name === 'InvalidPDFException') {
+    return wrap('Файл не открывается как PDF — возможно, он повреждён или скачан не полностью. Скачайте выписку заново и попробуйте ещё раз.');
+  }
+  if (error?.name === 'PdfWorkerTimeout') {
+    return wrap('Модуль чтения PDF не ответил за 30 секунд. Закройте приложение полностью, откройте снова и повторите импорт.');
+  }
+  if (stage === 'loading-modules') {
+    return wrap('Не удалось загрузить модуль чтения PDF. Проверьте интернет, перезапустите приложение и попробуйте снова.');
+  }
+  if (stage === 'starting-worker' || /worker/i.test(raw)) {
+    return wrap('Не удалось запустить модуль чтения PDF на этом устройстве. Перезапустите приложение; если ошибка повторится — пришлите разработчику подробности.');
+  }
+  if (stage === 'reading-file') return wrap('Не удалось прочитать файл с устройства. Сохраните PDF в «Файлы» и выберите его оттуда.');
+  if (stage === 'parsing') return wrap('PDF открылся, но операции не удалось разобрать. Пришлите разработчику подробности ниже.');
+  return wrap(`Не удалось прочитать PDF (${stageText}). Причина: ${raw}`);
+}
+
+/* ------------------------------------------------------------------ */
 /* 1. PDF → текст с координатами                                        */
 /* ------------------------------------------------------------------ */
 
 /**
  * Извлекает текст всех страниц: [{ items: [{ str, x, y, w }] }].
  * y растёт снизу вверх (как в PDF).
+ * onProgress(stage, page) сообщает, на каком этапе мы сейчас — для точных ошибок.
  */
-export async function extractPdfPages(data, pdfjsLib) {
+export async function extractPdfPages(data, pdfjsLib, onProgress = () => {}) {
+  onProgress('opening');
   const task = pdfjsLib.getDocument({ data, isEvalSupported: false, disableFontFace: true });
-  const doc = await task.promise;
+  let doc;
+  try {
+    doc = await task.promise;
+  } catch (e) {
+    await task.destroy().catch(() => {});
+    throw e;
+  }
   const pages = [];
   try {
     for (let n = 1; n <= doc.numPages; n += 1) {
+      onProgress('extracting-text', n);
       const page = await doc.getPage(n);
       const content = await page.getTextContent();
       const items = content.items
@@ -315,13 +408,13 @@ function buildRateLookup(rows) {
  */
 export function parseFreedomStatement(pages) {
   if (!isFreedomStatement(pages)) {
-    throw new Error('Это не похоже на выписку Freedom Bank. Пока поддерживаются выписки по карте Freedom (Super Card) и JSON-копии.');
+    throw new StatementFormatError('Это не похоже на выписку Freedom Bank. Пока поддерживаются выписки по карте Freedom (Super Card) и JSON-копии.');
   }
   const header = parseHeader(pages);
   const allRows = parseAllRows(pages);
   const rows = allRows.filter((r) => r.amountText);
   const unreadable = allRows.length - rows.length;
-  if (!rows.length) throw new Error('В выписке не найдено ни одной операции.');
+  if (!rows.length) throw new StatementFormatError('В выписке не найдено ни одной операции.');
 
   const rates = buildRateLookup(rows);
   const warnings = [];
@@ -336,7 +429,7 @@ export function parseFreedomStatement(pages) {
     const op = pending ? '' : r.op;
     const original = num(value);
     const { rate, source } = rates.rateFor(currency, day);
-    if (rate == null) throw new Error(`Неизвестная валюта ${currency} в операции от ${r.date}.`);
+    if (rate == null) throw new StatementFormatError(`Неизвестная валюта ${currency} в операции от ${r.date}.`);
     if (source === 'fallback') fallbackCount += 1;
     const amount = round2(original * rate);
     const categoryId = categorize({ op, sign, details: r.details, pending });

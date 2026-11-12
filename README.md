@@ -27,6 +27,8 @@ In **Профиль → Импорт данных** (or on the empty start scree
 - Rows are read by their position on the page, which handles details that wrap above and below the date line and rows split across two pages.
 - AED amounts are converted to tenge using the rates printed in the statement itself ("Между своими счетами по курсу …"). USD uses the AED rate × 3.6725, since the dirham is pegged to the dollar. The original amount is kept and shown next to each transaction.
 - Moves between your own accounts and deposits get the internal category "Между своими счетами". They change the balance but don't count as income or spending.
+- If an import fails, the app shows a plain-language message plus the exact technical cause (stage, error name and text, pdf.js version) with a «Скопировать подробности для разработчика» button, so problems on a phone can be debugged without a console. Password-protected PDFs get a specific message.
+- The pdf.js worker is bundled by Vite (`?worker`) as an ordinary `.js` file with a relative path and passed to pdf.js through `GlobalWorkerOptions.workerPort`. That avoids `.mjs` MIME-type issues and module-worker requirements on older iOS.
 - Importing replaces the main card's transactions for the statement's period and sets the balance to the statement's closing balance. Cash, other months, goals and the plan are kept, so importing the same statement twice creates no duplicates.
 
 ## Deploying to GitHub Pages

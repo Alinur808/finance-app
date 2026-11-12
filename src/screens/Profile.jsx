@@ -9,6 +9,7 @@ import { AI_PROVIDERS, detectProvider } from '../utils/advisor.js';
 import { downloadBackup } from '../utils/backup.js';
 import { useBackupImport } from '../hooks/useBackupImport.js';
 import ImportConfirm from '../components/ImportConfirm.jsx';
+import ImportErrorBox from '../components/ImportErrorBox.jsx';
 import { formatFullDate } from '../utils/dates.js';
 import { formatMoney, groupDigits, plural } from '../utils/format.js';
 import { Card, ScreenHeader, SectionHeader } from '../components/ui.jsx';
@@ -132,7 +133,7 @@ export default function Profile({ toast }) {
               </button>
             </div>
             <input id="import-file" {...backupImport.inputProps} />
-            {backupImport.error && <p className="rounded-xl bg-red-50 px-3 py-2 text-[13px] text-red-700">{backupImport.error}</p>}
+            <ImportErrorBox error={backupImport.error} />
             {backupImport.pending && <ImportConfirm pending={backupImport.pending} onConfirm={backupImport.confirm} onCancel={backupImport.cancel} />}
             <p className="flex gap-2 text-[12px] leading-snug text-ink-muted">
               <ShieldCheck size={15} className="mt-0.5 shrink-0 text-brand-600" />

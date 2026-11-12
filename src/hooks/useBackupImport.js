@@ -14,7 +14,8 @@ const TX_WORDS = ['операция', 'операции', 'операций'];
  * - pending       проверенный файл, ждёт подтверждения (если autoConfirm = false):
  *                 { kind: 'backup' | 'statement', transactions, … }
  * - busy          'reading' | 'parsing-pdf' | null — для индикатора
- * - error         текст ошибки чтения/проверки
+ * - error         ошибка чтения/проверки: строка или { message, details }
+ *                 (details — точная причина для разработчика, см. ImportErrorBox)
  *
  * autoConfirm: true — импортировать сразу, без вопроса «заменить данные?»
  * (используется, когда данных ещё нет и заменять нечего).
@@ -53,7 +54,8 @@ export function useBackupImport({ toast, autoConfirm = false } = {}) {
         else setPending(data);
       } catch (err) {
         setPending(null);
-        setError(err.message);
+        // и понятный текст, и точная причина — консоли на телефоне не видно
+        setError({ message: err?.message || String(err), details: err?.details || (err?.name && err.name !== 'Error' ? `${err.name}: ${err.message}` : '') });
       } finally {
         setBusy(null);
       }
