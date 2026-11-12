@@ -1,0 +1,8 @@
+node_modules
+dist
+*.local
+# bank data — never commit (the repository is public)
+*.pdf
+src/data/statement.json
+finance-backup-*.json
+finance-single.html
