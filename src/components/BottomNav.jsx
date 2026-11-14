@@ -3,7 +3,7 @@ import { LayoutGrid, PieChart, Plus, Target, User } from 'lucide-react';
 export const TABS = [
   { id: 'overview', label: 'Обзор', icon: LayoutGrid },
   { id: 'analytics', label: 'Аналитика', icon: PieChart },
-  { id: 'goals', label: 'Цели', icon: Target },
+  { id: 'goals', label: 'Планы', icon: Target },
   { id: 'profile', label: 'Профиль', icon: User },
 ];
 
@@ -17,7 +17,7 @@ export default function BottomNav({ active, onChange, onAdd }) {
       <button
         key={t.id}
         onClick={() => onChange(t.id)}
-        className={`flex flex-1 flex-col items-center gap-1 pt-2.5 text-[11px] font-semibold transition ${on ? 'text-brand-700' : 'text-ink-muted'}`}
+        className={`flex flex-1 flex-col items-center gap-1 pt-2.5 text-[11px] font-semibold transition-colors ${on ? 'text-brand-700' : 'text-ink-muted'}`}
         aria-current={on ? 'page' : undefined}
       >
         <t.icon size={22} strokeWidth={on ? 2.4 : 2} />

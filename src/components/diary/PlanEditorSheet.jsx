@@ -6,7 +6,7 @@ import { WEEKDAY_OPTIONS } from '../../utils/schedule.js';
 import BottomSheet from '../BottomSheet.jsx';
 import { PrimaryButton } from '../ui.jsx';
 
-const inputCls = 'h-11 rounded-xl bg-gray-100 px-3 text-[14px] outline-none focus:ring-2 focus:ring-brand-500';
+const inputCls = 'h-11 rounded-xl bg-gray-100 px-3 text-base outline-none focus:ring-2 focus:ring-brand-500';
 const digits = (v) => Number(String(v).replace(/\D/g, '').slice(0, 10));
 
 /** Редактор плана дневника: дедлайн, цели-покупки и регулярные поступления. */

@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+
+const VISIBLE_TIPS = 3;
 import { AlertTriangle, BadgeCheck, Bot, CalendarClock, Lightbulb, Loader2, PartyPopper, PenLine, Repeat, Scale, Sparkles, TrendingDown, Zap } from 'lucide-react';
 import { useFinance } from '../../context/FinanceContext.jsx';
 import { describeWeeks, getAIAdvice } from '../../utils/advisor.js';
@@ -42,6 +44,9 @@ function statusSentence(a, goal) {
 
 /** Советник: статус цели, денежный поток, советы, симулятор и (если есть ключ) ИИ-совет. */
 export default function AdvisorPanel({ advice, goal }) {
+  const [allTips, setAllTips] = useState(false);
+  useEffect(() => setAllTips(false), [goal.id]);
+  const tips = allTips ? advice.tips : advice.tips.slice(0, VISIBLE_TIPS);
   const s = STATUS[advice.status];
   const p = advice.profile;
   return (
@@ -94,7 +99,7 @@ export default function AdvisorPanel({ advice, goal }) {
 
       {advice.tips.length > 0 && advice.status !== 'done' && (
         <div className="space-y-3">
-          {advice.tips.map((tip, i) => {
+          {tips.map((tip, i) => {
             const Icon = TIP_ICON[tip.kind] ?? Lightbulb;
             const headline = i === 0;
             return (
@@ -126,6 +131,11 @@ export default function AdvisorPanel({ advice, goal }) {
               </Card>
             );
           })}
+          {advice.tips.length > VISIBLE_TIPS && (
+            <button onClick={() => setAllTips((v) => !v)} className="pressable h-11 w-full rounded-2xl bg-white text-sm font-semibold text-brand-700 shadow-card">
+              {allTips ? 'Свернуть советы' : `Ещё советы · ${advice.tips.length - VISIBLE_TIPS}`}
+            </button>
+          )}
         </div>
       )}
 

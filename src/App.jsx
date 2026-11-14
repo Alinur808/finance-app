@@ -12,21 +12,35 @@ import Profile from './screens/Profile.jsx';
 import { formatMoney } from './utils/format.js';
 
 export default function App() {
-  const { addTransaction, deleteTransaction, setFilters } = useFinance();
+  const { transactions, addTransaction, updateTransaction, deleteTransaction, setFilters, settings } = useFinance();
   const now = useNow();
   const [tab, setTab] = useState('overview');
+  const [goalsSection, setGoalsSection] = useState('goals');
   const [adding, setAdding] = useState(false);
-  const [selected, setSelected] = useState(null);
+  const [selectedId, setSelectedId] = useState(null);
   const [message, setMessage] = useState(null);
   const toast = useCallback((m) => setMessage(m), []);
   const clearToast = useCallback(() => setMessage(null), []);
+  const onSelectTx = useCallback((tx) => setSelectedId(tx.id), []);
+  const selected = selectedId ? transactions.find((t) => t.id === selectedId) : null;
+
+  const navigate = useCallback((next, section) => {
+    if (next === 'goals' && section) setGoalsSection(section);
+    setTab(next);
+  }, []);
 
   useEffect(() => {
     window.scrollTo({ top: 0 });
   }, [tab]);
 
+  const firstRun = !settings.onboarded && transactions.length === 0;
+  // после «Начать заново» и повторного старта — всегда на главный экран
+  useEffect(() => {
+    if (firstRun) setTab('overview');
+  }, [firstRun]);
+
   const screens = {
-    overview: <Overview now={now} onSelectTx={setSelected} onNavigate={setTab} onAdd={() => setAdding(true)} toast={toast} />,
+    overview: <Overview now={now} onSelectTx={onSelectTx} onNavigate={navigate} toast={toast} />,
     analytics: (
       <Analytics
         now={now}
@@ -36,17 +50,17 @@ export default function App() {
         }}
       />
     ),
-    goals: <Goals now={now} toast={toast} />,
+    goals: <Goals now={now} toast={toast} section={goalsSection} onSection={setGoalsSection} />,
     profile: <Profile toast={toast} />,
   };
 
   return (
-    <div className="relative mx-auto min-h-dvh max-w-md bg-canvas pb-28">
+    <div className="relative mx-auto min-h-dvh max-w-md bg-canvas" style={{ paddingBottom: firstRun ? 0 : 'calc(96px + env(safe-area-inset-bottom))' }}>
       <main key={tab} className="animate-fade-in">
-        {screens[tab]}
+        {screens[firstRun ? 'overview' : tab]}
       </main>
 
-      <BottomNav active={tab} onChange={setTab} onAdd={() => setAdding(true)} />
+      {!firstRun && <BottomNav active={tab} onChange={navigate} onAdd={() => setAdding(true)} />}
 
       <AddTransactionSheet
         open={adding}
@@ -59,10 +73,14 @@ export default function App() {
       />
       <TransactionDetailSheet
         tx={selected}
-        onClose={() => setSelected(null)}
+        onClose={() => setSelectedId(null)}
+        onChangeCategory={(id, categoryId) => {
+          updateTransaction(id, { categoryId });
+          toast('Категория изменена');
+        }}
         onDelete={(id) => {
           deleteTransaction(id);
-          setSelected(null);
+          setSelectedId(null);
           toast('Операция удалена');
         }}
       />

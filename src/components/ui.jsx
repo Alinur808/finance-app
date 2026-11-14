@@ -2,7 +2,7 @@
 
 export function Card({ className = '', children, ...rest }) {
   return (
-    <div className={`rounded-3xl bg-white shadow-card ${className}`} {...rest}>
+    <div className={`rounded-3xl bg-white shadow-card ring-1 ring-black/[0.03] ${className}`} {...rest}>
       {children}
     </div>
   );
@@ -13,7 +13,7 @@ export function SectionHeader({ title, action, onAction }) {
     <div className="mb-3 flex items-center justify-between px-1">
       <h2 className="text-[17px] font-bold tracking-tight text-ink">{title}</h2>
       {action && (
-        <button onClick={onAction} className="text-sm font-semibold text-brand-600 active:opacity-60">
+        <button onClick={onAction} className="text-sm font-semibold text-brand-600 transition-opacity active:opacity-60">
           {action}
         </button>
       )}
@@ -23,7 +23,7 @@ export function SectionHeader({ title, action, onAction }) {
 
 export function ScreenHeader({ title, subtitle, right }) {
   return (
-    <header className="flex items-end justify-between px-5 pb-4 pt-6">
+    <header className="flex items-end justify-between px-5 pb-4" style={{ paddingTop: 'max(24px, calc(env(safe-area-inset-top) + 12px))' }}>
       <div>
         {subtitle && <p className="text-sm font-medium text-ink-muted">{subtitle}</p>}
         <h1 className="text-[26px] font-extrabold tracking-tight text-ink">{title}</h1>
@@ -48,7 +48,7 @@ export function EmptyState({ icon: Icon, title, text }) {
 export function PrimaryButton({ className = '', children, ...rest }) {
   return (
     <button
-      className={`h-14 w-full rounded-2xl bg-brand-600 text-[16px] font-semibold text-white transition active:scale-[0.98] disabled:bg-gray-200 disabled:text-ink-muted ${className}`}
+      className={`pressable h-14 w-full rounded-2xl bg-brand-600 text-[16px] font-semibold text-white disabled:bg-gray-200 disabled:text-ink-muted ${className}`}
       {...rest}
     >
       {children}

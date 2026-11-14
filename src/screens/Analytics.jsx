@@ -27,13 +27,14 @@ export default function Analytics({ now, onPickCategory }) {
     [transactions, filters.period, filters.accountId, now], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
-  const t = totals(filtered);
-  const prev = totals(previous);
+  const t = useMemo(() => totals(filtered), [filtered]);
+  const prev = useMemo(() => totals(previous), [previous]);
   // курсовые разницы — копейки, на диаграмме они только мешают
   const breakdown = useMemo(() => spendingByCategory(filtered.filter((x) => x.categoryId !== 'fx')), [filtered]);
   const breakdownTotal = breakdown.reduce((s, c) => s + c.amount, 0);
   // сравниваем, только если прошлый период целиком покрыт данными (выписка начинается 12 октября)
-  const earliest = transactions.reduce((m, x) => Math.min(m, new Date(x.date).getTime()), Infinity);
+  // список отсортирован от новых к старым — самая ранняя операция последняя
+  const earliest = transactions.length ? new Date(transactions[transactions.length - 1].date).getTime() : Infinity;
   const prevCovered = startOfDay(earliest).getTime() <= range.prevStart.getTime();
   const change = prevCovered && prev.expense > 0 ? (t.expense - prev.expense) / prev.expense : null;
 

@@ -1,4 +1,4 @@
-import { ArrowDownLeft, ArrowUpRight, Bell, Eye, EyeOff } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Eye, EyeOff, UserRound } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext.jsx';
 import { formatMoney, groupDigits } from '../utils/format.js';
 import { PERIODS } from '../utils/dates.js';
@@ -7,7 +7,7 @@ import { PERIODS } from '../utils/dates.js';
  * Тёмно-зелёная шапка + золотая карта (название — из Профиля), которая наезжает на её край,
  * и под ней — доходы/расходы за выбранный период.
  */
-export default function BalanceCard({ balance, income, expense, accountName, accountKind }) {
+export default function BalanceCard({ balance, income, expense, accountName, accountKind, onOpenProfile }) {
   const { settings, updateSettings, filters } = useFinance();
   const hidden = settings.hideBalance;
   const periodLabel = PERIODS.find((p) => p.id === filters.period)?.label ?? '';
@@ -18,10 +18,10 @@ export default function BalanceCard({ balance, income, expense, accountName, acc
     <section>
       <div className="bg-gradient-to-b from-brand-800 to-brand-900 px-5 pb-28 text-white" style={{ paddingTop: 'max(20px, env(safe-area-inset-top))' }}>
         <div className="flex items-center justify-between pt-1">
-          <div className="flex items-center gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-full bg-white/15 text-sm font-bold ring-1 ring-white/25">
-              {settings.name.trim().slice(0, 1).toUpperCase() || '•'}
-            </div>
+          <button onClick={onOpenProfile} className="pressable flex items-center gap-3 text-left" aria-label="Открыть профиль">
+            <span className="grid h-10 w-10 place-items-center rounded-full bg-white/15 text-sm font-bold ring-1 ring-white/25">
+              {settings.name.trim() ? settings.name.trim().slice(0, 1).toUpperCase() : <UserRound size={18} />}
+            </span>
             <div className="leading-tight">
               {settings.name.trim() ? (
                 <>
@@ -32,9 +32,6 @@ export default function BalanceCard({ balance, income, expense, accountName, acc
                 <p className="font-semibold">{greeting()}!</p>
               )}
             </div>
-          </div>
-          <button className="grid h-10 w-10 place-items-center rounded-full bg-white/10 active:bg-white/20" aria-label="Уведомления">
-            <Bell size={19} />
           </button>
         </div>
       </div>
@@ -63,7 +60,7 @@ export default function BalanceCard({ balance, income, expense, accountName, acc
           </div>
 
           <p className="relative mt-6 text-[13px] font-medium text-[#3b2f17]/70">Текущий баланс</p>
-          <p className="tabular relative mt-0.5 text-[36px] font-extrabold leading-none tracking-tight">
+          <p className="relative mt-0.5 text-[36px] font-extrabold leading-none tracking-tight">
             {hidden ? (
               '••••••'
             ) : (

@@ -21,6 +21,9 @@ The script `scripts/parse_kaspi_statement.py` needs `pdftotext` (poppler-utils).
 
 **`src/data/statement.json` contains your bank data.** It holds your transactions and the names of people you sent money to or received money from, so it is listed in `.gitignore` and never goes to GitHub. When the file is missing (on GitHub Actions, or in a fresh clone), every build uses an empty statement instead.
 
+## First run
+A new visitor sees three choices: import a Freedom Bank PDF, restore a JSON backup, or start from scratch by entering the current card balance (plus optional card name and first name). There is no preset demo data, goal or budget. «Профиль → Начать заново» returns the device to this screen.
+
 ## Importing a Freedom Bank statement (PDF)
 In **Профиль → Импорт данных** (or on the empty start screen) you can choose a Freedom Bank Kazakhstan card statement (Super Card) as a PDF. It is parsed entirely in the browser with pdf.js (`src/utils/freedomParser.js`), and the file is never uploaded anywhere.
 
@@ -28,6 +31,7 @@ In **Профиль → Импорт данных** (or on the empty start scree
 - AED amounts are converted to tenge using the rates printed in the statement itself ("Между своими счетами по курсу …"). USD uses the AED rate × 3.6725, since the dirham is pegged to the dollar. The original amount is kept and shown next to each transaction.
 - Moves between your own accounts and deposits get the internal category "Между своими счетами". They change the balance but don't count as income or spending.
 - If an import fails, the app shows a plain-language message plus the exact technical cause (stage, error name and text, pdf.js version) with a «Скопировать подробности для разработчика» button, so problems on a phone can be debugged without a console. Password-protected PDFs get a specific message.
+- **Safari / iOS:** pdf.js 6 reads text with `for await` over a `ReadableStream`, which WebKit doesn't support (`TypeError … i of t`), and calls `Promise.withResolvers`, which iOS before 17.4 lacks. The app reads text with a manual `streamTextContent().getReader()` loop (`readTextContent` in `freedomParser.js`). It also installs small polyfills for both APIs (`src/utils/pdfCompat.js`) on the page and, through `src/workers/pdf.worker.js`, inside the worker before pdf.js loads.
 - The pdf.js worker is bundled by Vite (`?worker`) as an ordinary `.js` file with a relative path and passed to pdf.js through `GlobalWorkerOptions.workerPort`. That avoids `.mjs` MIME-type issues and module-worker requirements on older iOS.
 - Importing replaces the main card's transactions for the statement's period and sets the balance to the statement's closing balance. Cash, other months, goals and the plan are kept, so importing the same statement twice creates no duplicates.
 

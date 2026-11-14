@@ -3,13 +3,14 @@
  * только в момент выбора PDF — на скорость открытия приложения он не влияет.
  * Файл не покидает устройство: нет ни одного сетевого запроса с его содержимым.
  *
- * Воркер pdf.js собирается Vite через `?worker`: на выходе обычный .js-файл
+ * Воркер (workers/pdf.worker.js: полифиллы + pdf.js) собирается Vite через `?worker`: на выходе обычный .js-файл
  * с относительным путём (работает в подпапке GitHub Pages /finance-app/),
  * классический воркер без требований к MIME-типу .mjs и поддержке
  * module-воркеров (важно для старых iOS). Мы создаём его сами и передаём
  * в pdf.js через GlobalWorkerOptions.workerPort, поэтому pdf.js не ищет
  * воркер по URL и не уходит в «fake worker» на главном потоке.
  */
+import './pdfCompat.js'; // до загрузки pdf.js: полифиллы для Safari
 import { describePdfError, extractPdfPages, parseFreedomStatement } from './freedomParser.js';
 
 const WORKER_TIMEOUT_MS = 30_000;
@@ -19,7 +20,7 @@ let workerPromise = null;
 /** Один воркер на всё время работы приложения; при сбое — пересоздаём. */
 function getWorker() {
   if (!workerPromise) {
-    workerPromise = import('pdfjs-dist/legacy/build/pdf.worker.min.mjs?worker').then(({ default: PdfWorker }) => {
+    workerPromise = import('../workers/pdf.worker.js?worker').then(({ default: PdfWorker }) => {
       const worker = new PdfWorker({ name: 'pdfjs-worker' });
       worker.__lastError = null;
       worker.addEventListener('error', (e) => {

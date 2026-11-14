@@ -14,6 +14,9 @@ import {
   Briefcase,
   RotateCcw,
   ArrowRightLeft,
+  Home,
+  HeartPulse,
+  Plane,
 } from 'lucide-react';
 
 /**
@@ -32,10 +35,13 @@ export const CATEGORIES = {
   delivery: { id: 'delivery', name: 'Доставка еды', nameAcc: 'доставку еды', short: 'Доставка', type: 'expense', icon: Bike, color: '#eb6834', bg: '#fde9dd', ink: '#c4521f', discretionary: true },
   cafe: { id: 'cafe', name: 'Кафе и рестораны', nameAcc: 'кафе и рестораны', short: 'Кафе', type: 'expense', icon: UtensilsCrossed, color: '#eda100', bg: '#f6ecdc', ink: '#a8732b', discretionary: true },
   groceries: { id: 'groceries', name: 'Супермаркеты', nameAcc: 'супермаркеты', short: 'Продукты', type: 'expense', icon: ShoppingCart, color: '#1baf7a', bg: '#e2f3e6', ink: '#2e8a4f', discretionary: false },
-  taxi: { id: 'taxi', name: 'Такси', nameAcc: 'такси', short: 'Такси', type: 'expense', icon: CarTaxiFront, color: '#2a78d6', bg: '#e3eefb', ink: '#2a66b3', discretionary: true },
+  taxi: { id: 'taxi', name: 'Такси и транспорт', nameAcc: 'такси и транспорт', short: 'Транспорт', type: 'expense', icon: CarTaxiFront, color: '#2a78d6', bg: '#e3eefb', ink: '#2a66b3', discretionary: true },
   transfers: { id: 'transfers', name: 'Переводы', nameAcc: 'переводы', short: 'Переводы', type: 'expense', icon: ArrowLeftRight, color: '#6250d6', bg: '#ebe8fb', ink: '#5443bf', discretionary: false },
-  entertainment: { id: 'entertainment', name: 'Игры и развлечения', nameAcc: 'игры и развлечения', short: 'Игры', type: 'expense', icon: Gamepad2, color: '#e87ba4', bg: '#fbe7ef', ink: '#c04a7a', discretionary: true },
+  entertainment: { id: 'entertainment', name: 'Развлечения', nameAcc: 'развлечения', short: 'Развлечения', type: 'expense', icon: Gamepad2, color: '#e87ba4', bg: '#fbe7ef', ink: '#c04a7a', discretionary: true },
   subscriptions: { id: 'subscriptions', name: 'Подписки и сервисы', nameAcc: 'подписки и сервисы', short: 'Подписки', type: 'expense', icon: Repeat2, color: '#e34948', bg: '#fce6e5', ink: '#bf3534', discretionary: true },
+  housing: { id: 'housing', name: 'Жильё и коммуналка', nameAcc: 'жильё и коммуналку', short: 'Жильё', type: 'expense', icon: Home, color: '#8a6a4f', bg: '#f1ebe4', ink: '#7a5a3f', discretionary: false },
+  health: { id: 'health', name: 'Здоровье и аптеки', nameAcc: 'здоровье и аптеки', short: 'Здоровье', type: 'expense', icon: HeartPulse, color: '#d0457a', bg: '#fbe6ee', ink: '#b8325f', discretionary: false },
+  travel: { id: 'travel', name: 'Путешествия', nameAcc: 'путешествия', short: 'Поездки', type: 'expense', icon: Plane, color: '#0e9bb0', bg: '#ddf2f5', ink: '#0b7d8f', discretionary: true },
   shopping: { id: 'shopping', name: 'Покупки', nameAcc: 'покупки', short: 'Покупки', type: 'expense', icon: ShoppingBag, color: '#008300', bg: '#e4f1e0', ink: '#2f7a2f', discretionary: true },
   fees: { id: 'fees', name: 'Комиссии', nameAcc: 'комиссии', short: 'Комиссии', type: 'expense', icon: Receipt, color: '#a8a29e', bg: '#efeeec', ink: '#6b6762', discretionary: false },
   cash: { id: 'cash', name: 'Снятие наличных', nameAcc: 'снятие наличных', short: 'Наличные', type: 'expense', icon: Banknote, color: '#a8a29e', bg: '#efeeec', ink: '#6b6762', discretionary: false, system: true },

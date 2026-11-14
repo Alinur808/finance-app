@@ -47,6 +47,23 @@ export default function FinancialDiary({ now, toast }) {
     />
   );
 
+  // План ещё не задан — объясняем, что делает дневник, вместо таблицы нулей.
+  if (!plan.items.length && !plan.incomes.length) {
+    return (
+      <Card className="p-5">
+        <Header subtitle="План трат до выбранной даты" onEdit={() => setEditing(true)} />
+        <p className="mt-4 text-[15px] leading-relaxed text-ink-soft">
+          Впереди крупные траты — например, подарки, поездка или техника? Укажите их, дату и ожидаемые поступления, и дневник каждый день будет показывать, сколько можно
+          спокойно потратить, чтобы на всё хватило.
+        </p>
+        <button onClick={() => setEditing(true)} className="pressable mt-4 h-12 w-full rounded-2xl bg-brand-600 text-[15px] font-semibold text-white">
+          Составить план
+        </button>
+        {editor}
+      </Card>
+    );
+  }
+
   if (f.isOver) {
     return (
       <Card className="p-4">

@@ -3,13 +3,42 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    /* без задержки 300 мс и двойного тапа-зума на кнопках */
+    touch-action: manipulation;
+  }
   html,
   body {
     @apply bg-canvas text-ink antialiased;
     -webkit-tap-highlight-color: transparent;
   }
   body {
-    font-feature-settings: 'cv11', 'ss01';
+    min-height: 100dvh;
+    /* цифры одинаковой ширины во всём приложении — суммы и даты не «прыгают» */
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum', 'cv11';
+    /* без «резинки» за пределами страницы */
+    overscroll-behavior-y: none;
+  }
+  /* iOS увеличивает страницу при фокусе на поле со шрифтом меньше 16 px */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+  button,
+  a,
+  [role='button'] {
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  /* при открытом листе фон не прокручивается */
+  html.sheet-open,
+  html.sheet-open body {
+    overflow: hidden;
   }
 }
 
@@ -27,22 +56,45 @@
   .pb-safe {
     padding-bottom: env(safe-area-inset-bottom);
   }
+  /* мягкое нажатие для карточек и кнопок (только transform — дёшево для GPU) */
+  .pressable {
+    transition: transform 140ms cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: transform;
+  }
+  .pressable:active {
+    transform: scale(0.98);
+  }
+  /* длинные списки: браузер не рисует то, что за экраном */
+  .cv-auto {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 320px;
+  }
 }
 
 @keyframes sheet-in {
-  from { transform: translateY(100%); }
-  to { transform: translateY(0); }
+  from { transform: translate3d(0, 100%, 0); }
+  to { transform: translate3d(0, 0, 0); }
+}
+@keyframes sheet-out {
+  from { transform: translate3d(0, var(--drag, 0px), 0); }
+  to { transform: translate3d(0, 100%, 0); }
 }
 @keyframes fade-in {
   from { opacity: 0; }
   to { opacity: 1; }
 }
-@keyframes rise-in {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+@keyframes fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
 }
-.animate-sheet-in { animation: sheet-in 280ms cubic-bezier(0.22, 1, 0.36, 1); }
+@keyframes rise-in {
+  from { opacity: 0; transform: translate3d(0, 8px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+.animate-sheet-in { animation: sheet-in 300ms cubic-bezier(0.22, 1, 0.36, 1); }
+.animate-sheet-out { animation: sheet-out 220ms cubic-bezier(0.4, 0, 1, 1) forwards; }
 .animate-fade-in { animation: fade-in 200ms ease-out; }
+.animate-fade-out { animation: fade-out 220ms ease-in forwards; }
 .animate-rise-in { animation: rise-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both; }
 
 input[type='range'] {
@@ -51,6 +103,9 @@ input[type='range'] {
 
 @media (prefers-reduced-motion: reduce) {
   .animate-sheet-in,
+  .animate-sheet-out,
   .animate-fade-in,
-  .animate-rise-in { animation: none; }
+  .animate-fade-out,
+  .animate-rise-in { animation-duration: 1ms; }
+  .pressable { transition: none; }
 }

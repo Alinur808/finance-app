@@ -17,7 +17,7 @@ function MoneyField({ label, value, onChange }) {
           value={value ? groupDigits(value) : ''}
           placeholder="0"
           onChange={(e) => onChange(Number(e.target.value.replace(/\D/g, '').slice(0, 10)))}
-          className="tabular w-full bg-transparent text-[15px] font-semibold outline-none"
+          className="w-full bg-transparent text-base font-semibold outline-none"
         />
         <span className="font-semibold text-ink-muted">₸</span>
       </div>
@@ -25,14 +25,18 @@ function MoneyField({ label, value, onChange }) {
   );
 }
 
-export default function GoalFormSheet({ open, goal, onClose, onSave, onDelete }) {
+export default function GoalFormSheet({ open, goal, template, onClose, onSave, onDelete }) {
   const [form, setForm] = useState(null);
   useEffect(() => {
     if (!open) return;
     const d = new Date();
     d.setMonth(d.getMonth() + 3);
-    setForm(goal ? { ...goal, deadline: dayKey(goal.deadline) } : { id: null, name: '', emoji: '🛟', target: 500000, saved: 0, deadline: dayKey(d) });
-  }, [open, goal]);
+    setForm(
+      goal
+        ? { ...goal, deadline: dayKey(goal.deadline) }
+        : { id: null, name: template?.name ?? '', emoji: template?.emoji ?? '🛟', target: template?.target ?? 300000, saved: 0, deadline: dayKey(d) },
+    );
+  }, [open, goal, template]);
   if (!open || !form) return null;
 
   const set = (p) => setForm((f) => ({ ...f, ...p }));
@@ -73,7 +77,7 @@ export default function GoalFormSheet({ open, goal, onClose, onSave, onDelete })
             value={form.name}
             onChange={(e) => set({ name: e.target.value })}
             placeholder="Например, новый ноутбук"
-            className="h-12 w-full rounded-2xl bg-gray-100 px-4 text-[15px] font-semibold outline-none placeholder:font-normal placeholder:text-ink-muted focus:ring-2 focus:ring-brand-500"
+            className="h-12 w-full rounded-2xl bg-gray-100 px-4 text-base font-semibold outline-none placeholder:font-normal placeholder:text-ink-muted focus:ring-2 focus:ring-brand-500"
           />
         </label>
         <div className="flex flex-wrap gap-2">
@@ -93,7 +97,7 @@ export default function GoalFormSheet({ open, goal, onClose, onSave, onDelete })
             min={dayKey(new Date())}
             value={form.deadline}
             onChange={(e) => set({ deadline: e.target.value })}
-            className="h-12 w-full rounded-2xl bg-gray-100 px-4 text-[15px] font-semibold outline-none focus:ring-2 focus:ring-brand-500"
+            className="h-12 w-full rounded-2xl bg-gray-100 px-4 text-base font-semibold outline-none focus:ring-2 focus:ring-brand-500"
           />
         </label>
         {goal && (

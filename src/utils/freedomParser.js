@@ -117,6 +117,28 @@ export function describePdfError(error, stage, extra = {}) {
 /* ------------------------------------------------------------------ */
 
 /**
+ * Текст страницы без `for await`: pdf.js 6 внутри getTextContent() перебирает
+ * ReadableStream через асинхронный итератор, которого нет в Safari.
+ * Читаем поток вручную через reader.read() и собираем то же самое.
+ */
+export async function readTextContent(page) {
+  const reader = page.streamTextContent().getReader();
+  const content = { items: [], styles: Object.create(null), lang: null };
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      content.lang ??= value.lang ?? null;
+      Object.assign(content.styles, value.styles);
+      for (const item of value.items) content.items.push(item); // без spread: страницы бывают огромными
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  return content;
+}
+
+/**
  * Извлекает текст всех страниц: [{ items: [{ str, x, y, w }] }].
  * y растёт снизу вверх (как в PDF).
  * onProgress(stage, page) сообщает, на каком этапе мы сейчас — для точных ошибок.
@@ -136,7 +158,7 @@ export async function extractPdfPages(data, pdfjsLib, onProgress = () => {}) {
     for (let n = 1; n <= doc.numPages; n += 1) {
       onProgress('extracting-text', n);
       const page = await doc.getPage(n);
-      const content = await page.getTextContent();
+      const content = await readTextContent(page);
       const items = content.items
         .filter((it) => typeof it.str === 'string' && it.str.trim())
         .map((it) => ({ str: it.str.replace(/\s+/g, ' ').trim(), x: it.transform[4], y: it.transform[5], w: it.width }));
@@ -320,6 +342,9 @@ const MERCHANT_RULES = [
   [/careem quik|noon minutes|habeeb|qiso|spinneys|grocery|supermarket|super market|fresh market|gmg consumer|blue box vending|enoc|carrefour|lulu|mini ?mart|magnum|small|galmart|anvar/i, 'groceries'],
   [/mcdonald|kfc|hardee|burger|tannoureen|serrano|kausar|slaw|starbucks|raising cane|find salt|restaura|cafe|coffee|qlub|shawarma|pizza|bahandi|salam bro|del papa|cinnabon/i, 'cafe'],
   [/taxi|uber|careem|yandex ?go|indrive|bolt|\bRTA\b|parking|zed mobility|salik|\bnol\b/i, 'taxi'],
+  [/booking|trip\.com|premier inn|hotel|airbnb|aviata|chocotravel|air ?astana|flydubai|emirates|airline|hostel/i, 'travel'],
+  [/pharmacy|аптек|clinic|hospital|dental|eyezone|optic|медцентр|invivo/i, 'health'],
+  [/\brent\b|аренд|коммунал|alseco|utilities|dewa|real estate|properties/i, 'housing'],
   [/apple\.com|itunes|google|anthropic|claude|openai|netflix|spotify|youtube|chatgpt|amazon prime|thebestpdf|preply/i, 'subscriptions'],
   [/game|steam|playstation|cinema|kinopark|vox /i, 'entertainment'],
 ];

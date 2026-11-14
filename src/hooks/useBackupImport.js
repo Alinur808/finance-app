@@ -4,6 +4,7 @@ import { readImportFile } from '../utils/backup.js';
 import { plural } from '../utils/format.js';
 
 const TX_WORDS = ['операция', 'операции', 'операций'];
+const DEFAULT_ACCEPT = '.json,.pdf,application/json,application/pdf';
 
 /**
  * Общая логика «Импорт данных» для Профиля и пустого дашборда.
@@ -64,11 +65,16 @@ export function useBackupImport({ toast, autoConfirm = false } = {}) {
   );
 
   return {
-    openPicker: () => inputRef.current?.click(),
+    // accept — какие файлы показать в системном выборе (например, только PDF)
+    openPicker: (accept = DEFAULT_ACCEPT) => {
+      if (!inputRef.current) return;
+      inputRef.current.accept = typeof accept === 'string' ? accept : DEFAULT_ACCEPT; // onClick передаёт событие
+      inputRef.current.click();
+    },
     inputProps: {
       ref: inputRef,
       type: 'file',
-      accept: '.json,.pdf,application/json,application/pdf',
+      accept: DEFAULT_ACCEPT,
       className: 'hidden',
       onChange,
     },
