@@ -13,8 +13,8 @@ export default function DiarySummary({ forecast: f, hidden, onOpen }) {
   const short = f.safe < 0;
   const headline = short ? `Не хватает ${money(-f.safe)}` : over ? `Перерасход сегодня ${money(-f.leftToday)}` : `Сегодня можно ещё ${money(f.leftToday)}`;
   return (
-    <button onClick={onOpen} className="pressable flex w-full items-center gap-3 rounded-3xl bg-white p-3.5 text-left shadow-card ring-1 ring-black/[0.03]">
-      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#f6ecdc] text-[#a8732b]">
+    <button onClick={onOpen} className="pressable flex w-full items-center gap-3 rounded-3xl bg-surface p-3.5 text-left shadow-card">
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-amber-50 text-amber-700">
         <NotebookPen size={18} />
       </span>
       <span className="min-w-0 flex-1">

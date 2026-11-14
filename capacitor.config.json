@@ -1,0 +1,13 @@
+{
+  "appId": "app.tenge.finance",
+  "appName": "Финансы",
+  "webDir": "dist",
+  "backgroundColor": "#050507",
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#050507"
+  },
+  "android": {
+    "backgroundColor": "#050507"
+  }
+}

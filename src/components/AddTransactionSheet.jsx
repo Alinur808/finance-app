@@ -9,7 +9,7 @@ import CategoryIcon from './CategoryIcon.jsx';
 import { PrimaryButton } from './ui.jsx';
 
 const blank = () => ({ type: 'expense', amount: '', categoryId: null, merchant: '', accountId: 'kaspi', day: dayKey(new Date()) });
-const chip = (on) => `pressable h-11 shrink-0 rounded-2xl px-4 text-[15px] font-semibold ${on ? 'bg-ink text-white' : 'bg-gray-100 text-ink-soft'}`;
+const chip = (on) => `pressable h-11 shrink-0 rounded-2xl px-4 text-[15px] font-semibold ${on ? 'bg-ink text-on-ink' : 'bg-gray-100 text-ink-soft'}`;
 
 /**
  * Быстрый ввод операции: сумма (цифровая клавиатура с запятой) → категория
@@ -36,10 +36,7 @@ export default function AddTransactionSheet({ open, onClose, onSave }) {
     for (const t of transactions.slice(0, 500)) counts.set(t.categoryId, (counts.get(t.categoryId) ?? 0) + 1);
     return counts;
   }, [transactions]);
-  const categories = useMemo(
-    () => categoryList(form.type).sort((a, b) => (usage.get(b.id) ?? 0) - (usage.get(a.id) ?? 0)),
-    [form.type, usage],
-  );
+  const categories = useMemo(() => categoryList(form.type).sort((a, b) => (usage.get(b.id) ?? 0) - (usage.get(a.id) ?? 0)), [form.type, usage]);
 
   const amount = amountToNumber(form.amount);
   const valid = amount > 0 && form.categoryId;
@@ -52,7 +49,14 @@ export default function AddTransactionSheet({ open, onClose, onSave }) {
     const now = new Date();
     const [y, m, d] = form.day.split('-').map(Number);
     const date = new Date(y, m - 1, d, now.getHours(), now.getMinutes());
-    onSave({ type: form.type, amount: Math.round(amount * 100) / 100, categoryId: form.categoryId, merchant: form.merchant.trim(), accountId: form.accountId, date: date.toISOString() });
+    onSave({
+      type: form.type,
+      amount: Math.round(amount * 100) / 100,
+      categoryId: form.categoryId,
+      merchant: form.merchant.trim(),
+      accountId: form.accountId,
+      date: date.toISOString(),
+    });
   };
 
   return (
@@ -72,7 +76,7 @@ export default function AddTransactionSheet({ open, onClose, onSave }) {
           <button
             key={t}
             onClick={() => set({ type: t, categoryId: null })}
-            className={`h-10 rounded-xl text-[15px] font-semibold transition-colors ${form.type === t ? 'bg-white shadow-card' : 'text-ink-muted'}`}
+            className={`h-10 rounded-xl text-[15px] font-semibold transition-colors ${form.type === t ? 'bg-surface shadow-card' : 'text-ink-muted'}`}
           >
             {t === 'expense' ? 'Расход' : 'Доход'}
           </button>
@@ -159,7 +163,7 @@ export default function AddTransactionSheet({ open, onClose, onSave }) {
           max={today}
           value={form.day}
           onChange={(e) => e.target.value && set({ day: e.target.value })}
-          className={`h-11 min-w-0 flex-1 rounded-2xl px-3 text-base font-semibold outline-none ${form.day !== today && form.day !== yesterday ? 'bg-ink text-white' : 'bg-gray-100 text-ink-soft'}`}
+          className={`h-11 min-w-0 flex-1 rounded-2xl px-3 text-base font-semibold outline-none ${form.day !== today && form.day !== yesterday ? 'bg-ink text-on-ink' : 'bg-gray-100 text-ink-soft'}`}
           aria-label="Выбрать дату"
         />
       </div>

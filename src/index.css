@@ -2,6 +2,149 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Дизайн-система «First-Principles Luxury».
+ * Obsidian — тёмная тема по умолчанию (OLED: настоящий чёрный, поверхности
+ * #0E1015, волосяные границы 8 % белого). Alabaster — дневная тема.
+ * Тема — атрибут data-theme на <html> (ставит ThemeContext и скрипт в index.html
+ * до первой отрисовки, без вспышки).
+ */
+:root,
+:root[data-theme='obsidian'] {
+  color-scheme: dark;
+  --canvas: 5 5 7;
+  --surface: 14 16 21;
+  --surface-raised: 21 24 31;
+  --ink: 244 245 247;
+  --ink-soft: 168 173 183;
+  --ink-muted: 124 130 142;
+  --on-ink: 5 5 7;
+  --hairline: rgba(255, 255, 255, 0.08);
+
+  --gray-50: 19 21 27;
+  --gray-100: 26 29 36;
+  --gray-200: 38 42 51;
+  --gray-300: 64 69 80;
+  --gray-900: 0 0 0;
+
+  /* emerald — доходы и свободные деньги */
+  --brand-50: 9 36 28;
+  --brand-100: 12 52 40;
+  --brand-200: 9 82 61;
+  --brand-300: 7 110 80;
+  --brand-400: 13 148 107;
+  --brand-500: 16 185 129;
+  --brand-600: 16 185 129;
+  --brand-700: 52 211 153;
+  --brand-800: 110 231 183;
+  --brand-900: 167 243 208;
+
+  /* coral — расходы */
+  --red-50: 40 19 17;
+  --red-100: 61 28 24;
+  --red-200: 88 38 31;
+  --red-300: 132 56 45;
+  --red-500: 255 122 102;
+  --red-600: 242 100 79;
+  --red-700: 255 150 134;
+  --red-800: 255 180 168;
+  --red-900: 255 207 199;
+
+  --amber-50: 38 29 14;
+  --amber-100: 60 45 18;
+  --amber-400: 245 181 68;
+  --amber-500: 232 162 58;
+  --amber-600: 199 134 31;
+  --amber-700: 246 197 110;
+  --amber-800: 248 208 138;
+  --amber-900: 250 224 174;
+
+  --orange-50: 42 26 16;
+  --orange-500: 251 138 60;
+
+  --shadow-card: 0 0 0 1px rgba(255, 255, 255, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --shadow-float: 0 10px 30px rgba(16, 185, 129, 0.28), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  --shadow-sheet: 0 -1px 0 rgba(255, 255, 255, 0.08), 0 -24px 60px rgba(0, 0, 0, 0.6);
+
+  /* «металлическая» карта баланса */
+  --card-bg: radial-gradient(120% 90% at 100% 0%, rgba(16, 185, 129, 0.16) 0%, rgba(16, 185, 129, 0) 55%),
+    linear-gradient(150deg, #1c1f27 0%, #0f1116 48%, #08090c 100%);
+  --card-ink: 244 245 247;
+  --card-edge: rgba(255, 255, 255, 0.1);
+  --card-sheen: rgba(255, 255, 255, 0.06);
+
+  --chart-grid: rgba(255, 255, 255, 0.07);
+  --chart-income: #0d9b6b;
+  --chart-burn: #ee5f4a;
+  --chart-net: #f4f5f7;
+}
+
+:root[data-theme='alabaster'] {
+  color-scheme: light;
+  --canvas: 245 244 240;
+  --surface: 255 255 255;
+  --surface-raised: 255 255 255;
+  --ink: 11 12 15;
+  --ink-soft: 74 79 88;
+  --ink-muted: 120 125 134;
+  --on-ink: 255 255 255;
+  --hairline: rgba(11, 12, 15, 0.08);
+
+  --gray-50: 248 247 244;
+  --gray-100: 240 239 235;
+  --gray-200: 226 225 220;
+  --gray-300: 196 195 189;
+  --gray-900: 17 18 20;
+
+  --brand-50: 236 253 245;
+  --brand-100: 209 250 229;
+  --brand-200: 167 243 208;
+  --brand-300: 110 231 183;
+  --brand-400: 52 211 153;
+  --brand-500: 16 185 129;
+  --brand-600: 5 150 105;
+  --brand-700: 4 120 87;
+  --brand-800: 6 95 70;
+  --brand-900: 6 78 59;
+
+  --red-50: 255 241 239;
+  --red-100: 255 225 220;
+  --red-200: 255 199 190;
+  --red-300: 252 163 151;
+  --red-500: 240 97 79;
+  --red-600: 220 72 58;
+  --red-700: 188 53 39;
+  --red-800: 150 42 31;
+  --red-900: 111 31 23;
+
+  --amber-50: 255 248 235;
+  --amber-100: 253 236 200;
+  --amber-400: 247 181 56;
+  --amber-500: 238 160 32;
+  --amber-600: 208 135 18;
+  --amber-700: 169 105 14;
+  --amber-800: 131 82 15;
+  --amber-900: 94 59 12;
+
+  --orange-50: 255 243 235;
+  --orange-500: 234 108 20;
+
+  --shadow-card: 0 0 0 1px rgba(11, 12, 15, 0.05), 0 1px 2px rgba(11, 12, 15, 0.04), 0 6px 20px rgba(11, 12, 15, 0.04);
+  --shadow-float: 0 10px 28px rgba(11, 12, 15, 0.28);
+  --shadow-sheet: 0 -12px 40px rgba(11, 12, 15, 0.12);
+
+  --card-bg: radial-gradient(110% 80% at 100% 0%, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0) 55%),
+    linear-gradient(150deg, #f4efe4 0%, #e6dcc8 50%, #d6c7a8 100%);
+  --card-ink: 33 27 16;
+  --card-edge: rgba(80, 60, 20, 0.14);
+  --card-sheen: rgba(255, 255, 255, 0.5);
+
+  --chart-grid: rgba(11, 12, 15, 0.07);
+  --chart-income: #059669;
+  --chart-burn: #e0563f;
+  --chart-net: #0b0c0f;
+}
+
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
@@ -18,15 +161,20 @@
     min-height: 100dvh;
     /* цифры одинаковой ширины во всём приложении — суммы и даты не «прыгают» */
     font-variant-numeric: tabular-nums;
-    font-feature-settings: 'tnum', 'cv11';
+    font-feature-settings: 'tnum', 'cv11', 'ss01';
     /* без «резинки» за пределами страницы */
     overscroll-behavior-y: none;
+    transition: background-color 240ms ease;
   }
   /* iOS увеличивает страницу при фокусе на поле со шрифтом меньше 16 px */
   input,
   select,
   textarea {
-    font-size: 16px;
+    font-size: max(16px, 1em);
+  }
+  input::placeholder,
+  textarea::placeholder {
+    color: rgb(var(--ink-muted) / 0.8);
   }
   button,
   a,
@@ -39,6 +187,10 @@
   html.sheet-open,
   html.sheet-open body {
     overflow: hidden;
+  }
+  /* нативные контролы (дата, select) — в цветах темы */
+  input[type='date'] {
+    color-scheme: inherit;
   }
 }
 
@@ -58,19 +210,50 @@
   }
   /* мягкое нажатие для карточек и кнопок (только transform — дёшево для GPU) */
   .pressable {
-    transition: transform 140ms cubic-bezier(0.22, 1, 0.36, 1);
+    transition: transform 160ms cubic-bezier(0.22, 1, 0.36, 1);
     will-change: transform;
   }
   .pressable:active {
-    transform: scale(0.98);
+    transform: scale(0.975);
   }
   /* длинные списки: браузер не рисует то, что за экраном */
   .cv-auto {
     content-visibility: auto;
     contain-intrinsic-size: auto 320px;
   }
+  /* мелкие заголовки-«капсулы» в стиле приватного банкинга */
+  .eyebrow {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgb(var(--ink-muted));
+  }
 }
 
+/* иконка категории: пастель в Alabaster, цветное свечение в Obsidian */
+.cat-icon {
+  background-color: var(--cat-bg);
+  color: var(--cat-ink);
+}
+:root:not([data-theme='alabaster']) .cat-icon {
+  background-color: var(--cat-tint);
+  color: var(--cat-color);
+}
+
+/* Stealth Mode: суммы на мгновение уходят в размытие и меняются на «••••••» */
+main {
+  transition: filter 160ms ease, opacity 160ms ease;
+}
+html.privacy-veil main {
+  filter: blur(6px);
+  opacity: 0.55;
+}
+.money-mask {
+  letter-spacing: 0.06em;
+}
+
+/* iOS-кривая листа (как у UISheetPresentationController) */
 @keyframes sheet-in {
   from { transform: translate3d(0, 100%, 0); }
   to { transform: translate3d(0, 0, 0); }
@@ -91,14 +274,27 @@
   from { opacity: 0; transform: translate3d(0, 8px, 0); }
   to { opacity: 1; transform: translate3d(0, 0, 0); }
 }
-.animate-sheet-in { animation: sheet-in 300ms cubic-bezier(0.22, 1, 0.36, 1); }
-.animate-sheet-out { animation: sheet-out 220ms cubic-bezier(0.4, 0, 1, 1) forwards; }
-.animate-fade-in { animation: fade-in 200ms ease-out; }
-.animate-fade-out { animation: fade-out 220ms ease-in forwards; }
-.animate-rise-in { animation: rise-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+@keyframes shake {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  20% { transform: translate3d(-12px, 0, 0); }
+  40% { transform: translate3d(10px, 0, 0); }
+  60% { transform: translate3d(-7px, 0, 0); }
+  80% { transform: translate3d(4px, 0, 0); }
+}
+@keyframes unveil {
+  from { opacity: 0; filter: blur(6px); }
+  to { opacity: 1; filter: blur(0); }
+}
+.animate-sheet-in { animation: sheet-in 440ms cubic-bezier(0.32, 0.72, 0, 1); }
+.animate-sheet-out { animation: sheet-out 240ms cubic-bezier(0.4, 0, 1, 1) forwards; }
+.animate-fade-in { animation: fade-in 220ms ease-out; }
+.animate-fade-out { animation: fade-out 240ms ease-in forwards; }
+.animate-rise-in { animation: rise-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-shake { animation: shake 420ms cubic-bezier(0.36, 0.07, 0.19, 0.97); }
+.animate-unveil { animation: unveil 320ms cubic-bezier(0.22, 1, 0.36, 1) both; }
 
 input[type='range'] {
-  accent-color: #0f8a5a;
+  accent-color: rgb(var(--brand-500));
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -106,6 +302,9 @@ input[type='range'] {
   .animate-sheet-out,
   .animate-fade-in,
   .animate-fade-out,
-  .animate-rise-in { animation-duration: 1ms; }
-  .pressable { transition: none; }
+  .animate-rise-in,
+  .animate-shake,
+  .animate-unveil { animation-duration: 1ms; }
+  .pressable,
+  main { transition: none; }
 }

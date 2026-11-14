@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-
-const VISIBLE_TIPS = 3;
-import { AlertTriangle, BadgeCheck, Bot, CalendarClock, Lightbulb, Loader2, PartyPopper, PenLine, Repeat, Scale, Sparkles, TrendingDown, Zap } from 'lucide-react';
+import { AlertTriangle, BadgeCheck, Bot, CalendarClock, Lightbulb, Loader2, Lock, PartyPopper, PenLine, Repeat, Scale, Sparkles, TrendingDown, Zap } from 'lucide-react';
 import { useFinance } from '../../context/FinanceContext.jsx';
+import { useSubscription } from '../../context/SubscriptionContext.jsx';
+import { usePrivacy } from '../../hooks/usePrivacy.js';
 import { describeWeeks, getAIAdvice } from '../../utils/advisor.js';
 import { formatFullDate } from '../../utils/dates.js';
-import { formatMoney, formatPercent } from '../../utils/format.js';
+import { formatMoney, formatPercent, plural } from '../../utils/format.js';
 import CategoryIcon from '../CategoryIcon.jsx';
 import { Card } from '../ui.jsx';
 import WhatIfSimulator from './WhatIfSimulator.jsx';
@@ -13,16 +13,17 @@ import WhatIfSimulator from './WhatIfSimulator.jsx';
 /** Расчётные суммы показываем без тиынов. */
 const money = (v, opts = {}) => formatMoney(v, { decimals: false, ...opts });
 
+const VISIBLE_TIPS = 3;
+
 const STATUS = {
-  'on-track': { icon: BadgeCheck, label: 'Успеваете', cls: 'bg-brand-50 text-brand-700 ring-brand-100' },
-  behind: { icon: AlertTriangle, label: 'Отстаёте от графика', cls: 'bg-amber-50 text-amber-800 ring-amber-100' },
-  negative: { icon: TrendingDown, label: 'Расходы больше доходов', cls: 'bg-red-50 text-red-700 ring-red-100' },
-  done: { icon: PartyPopper, label: 'Цель достигнута', cls: 'bg-brand-50 text-brand-700 ring-brand-100' },
-  'no-data': { icon: PenLine, label: 'Мало данных', cls: 'bg-gray-100 text-ink-soft ring-gray-200' },
+  'on-track': { icon: BadgeCheck, label: 'Успеваете', cls: 'bg-brand-50 text-brand-700 ring-brand-500/20' },
+  behind: { icon: AlertTriangle, label: 'Отстаёте от плана', cls: 'bg-amber-50 text-amber-800 ring-amber-500/20' },
+  negative: { icon: TrendingDown, label: 'Тратите больше, чем получаете', cls: 'bg-red-50 text-red-700 ring-red-500/20' },
+  done: { icon: PartyPopper, label: 'Цель достигнута', cls: 'bg-brand-50 text-brand-700 ring-brand-500/20' },
+  'no-data': { icon: PenLine, label: 'Мало данных', cls: 'bg-gray-100 text-ink-soft ring-hairline' },
 };
 
-export const NO_DATA_MESSAGE =
-  'Пока недостаточно данных для анализа. Добавьте свои первые доходы и расходы, чтобы я мог дать финансовый совет!';
+export const NO_DATA_MESSAGE = 'Пока недостаточно данных для анализа. Добавьте свои первые доходы и расходы, чтобы я мог дать финансовый совет!';
 
 const TIP_ICON = { habit: Repeat, rule: Scale, action: Zap };
 
@@ -34,19 +35,23 @@ function statusSentence(a, goal) {
     case 'done':
       return `Вы накопили все ${money(goal.target)}. Пора поставить следующую цель!`;
     case 'negative':
-      return `Сейчас вы тратите на ${money(-a.profile.savings)} в месяц больше, чем получаете, поэтому цель не растёт. Чтобы успеть к ${formatFullDate(goal.deadline)}, нужно освобождать ${money(a.requiredMonthly)} в месяц.`;
+      return `Расходы больше доходов на ${money(-a.profile.savings)} в месяц — денег становится меньше. Чтобы успеть к ${formatFullDate(goal.deadline)}, нужно откладывать ${money(a.requiredMonthly)} в месяц.`;
     case 'on-track':
-      return `При текущем темпе ${pace} в месяц вы накопите за ${describeWeeks(a.baseWeeks)} (к ${formatFullDate(a.eta)}) — на ${describeWeeks(a.weeksLeft - a.baseWeeks)} раньше срока.`;
+      return `Откладываете ${pace} в месяц — цель через ${describeWeeks(a.baseWeeks)} (${formatFullDate(a.eta)}), на ${describeWeeks(a.weeksLeft - a.baseWeeks)} раньше срока.`;
     default:
-      return `При темпе ${pace} в месяц цель будет достигнута примерно к ${formatFullDate(a.eta)} — позже срока (${formatFullDate(goal.deadline)}). Нужно откладывать ещё ${money(a.shortfall)} в месяц.`;
+      return `Откладываете ${pace} в месяц — цель к ${formatFullDate(a.eta)}, позже срока (${formatFullDate(goal.deadline)}). Не хватает ${money(a.shortfall)} в месяц.`;
   }
 }
 
 /** Советник: статус цели, денежный поток, советы, симулятор и (если есть ключ) ИИ-совет. */
 export default function AdvisorPanel({ advice, goal }) {
   const [allTips, setAllTips] = useState(false);
+  const { limits, openPaywall } = useSubscription();
+  const { text } = usePrivacy();
   useEffect(() => setAllTips(false), [goal.id]);
-  const tips = allTips ? advice.tips : advice.tips.slice(0, VISIBLE_TIPS);
+  const unlocked = advice.tips.slice(0, limits.insights);
+  const lockedCount = advice.tips.length - unlocked.length;
+  const tips = allTips ? unlocked : unlocked.slice(0, VISIBLE_TIPS);
   const s = STATUS[advice.status];
   const p = advice.profile;
   return (
@@ -56,8 +61,8 @@ export default function AdvisorPanel({ advice, goal }) {
           <Sparkles size={17} />
         </span>
         <div>
-          <h2 className="text-[17px] font-bold leading-tight tracking-tight">Умный советник</h2>
-          <p className="text-[12px] text-ink-muted">По вашим операциям за последние {p.windowDays} дн.</p>
+          <h2 className="text-[17px] font-semibold leading-tight tracking-tight">Стратег</h2>
+          <p className="text-[12px] text-ink-muted">По вашим операциям за {p.windowDays} дн.</p>
         </div>
       </div>
 
@@ -65,7 +70,7 @@ export default function AdvisorPanel({ advice, goal }) {
         <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-bold ring-1 ${s.cls}`}>
           <s.icon size={14} /> {s.label}
         </span>
-        <p className="mt-2.5 text-[15px] leading-snug text-ink">{statusSentence(advice, goal)}</p>
+        <p className="mt-2.5 text-[15px] leading-snug text-ink">{text(statusSentence(advice, goal))}</p>
 
         {/* Без данных цифры (0 ₸ / 0 ₸ / 0 ₸) только путают — показываем одно сообщение. */}
         {advice.status !== 'no-data' && (
@@ -76,9 +81,9 @@ export default function AdvisorPanel({ advice, goal }) {
                 ['Расходы', money(p.expense, { compact: true }), 'text-ink'],
                 ['Остаётся', money(p.savings, { compact: true, sign: true }), p.savings >= 0 ? 'text-brand-600' : 'text-red-600'],
               ].map(([k, v, cls]) => (
-                <div key={k} className="rounded-2xl bg-gray-50 px-1 py-2.5">
+                <div key={k} className="min-w-0 rounded-2xl bg-gray-50 px-1 py-2.5">
                   <p className="text-[11px] font-medium text-ink-muted">{k} / мес</p>
-                  <p className={`tabular text-[14px] font-bold ${cls}`}>{v}</p>
+                  <p className={`tabular truncate text-[14px] font-semibold ${cls}`}>{text(v)}</p>
                 </div>
               ))}
             </div>
@@ -86,7 +91,7 @@ export default function AdvisorPanel({ advice, goal }) {
               <div className="mt-3 flex items-center gap-2.5 rounded-2xl border border-dashed border-gray-200 px-3 py-2.5">
                 <CalendarClock size={18} className="shrink-0 text-ink-muted" />
                 <p className="text-[13px] leading-snug text-ink-soft">
-                  Чтобы успеть к сроку, откладывайте <span className="tabular font-bold text-ink">{money(advice.requiredMonthly)} в месяц</span>
+                  Чтобы успеть, откладывайте <span className="tabular font-semibold text-ink">{text(money(advice.requiredMonthly))} в месяц</span>
                   {p.income > 0 && <span className="text-ink-muted"> · {formatPercent(advice.requiredMonthly / p.income)} дохода</span>}
                 </p>
               </div>
@@ -113,15 +118,13 @@ export default function AdvisorPanel({ advice, goal }) {
                     </span>
                   )}
                   <div className="min-w-0 flex-1">
-                    {headline && <p className="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-brand-600">Главный совет</p>}
-                    <p className="text-[15px] font-bold leading-snug">{tip.title}</p>
-                    <p className="mt-1 text-sm leading-relaxed text-ink-soft">{tip.text}</p>
+                    {headline && <p className="mb-0.5 text-[11px] font-semibold uppercase tracking-wider text-brand-600">Главный совет</p>}
+                    <p className="text-[15px] font-semibold leading-snug">{text(tip.title)}</p>
+                    <p className="mt-1 text-sm leading-relaxed text-ink-soft">{text(tip.text)}</p>
                     {(tip.monthlyImpact > 0 || tip.impactLabel) && (
                       <div className="mt-2.5 flex flex-wrap gap-1.5">
                         {tip.monthlyImpact > 0 && (
-                          <span className="tabular rounded-full bg-brand-50 px-2.5 py-1 text-[12px] font-semibold text-brand-700">
-                            +{money(tip.monthlyImpact)}/мес
-                          </span>
+                          <span className="tabular rounded-full bg-brand-50 px-2.5 py-1 text-[12px] font-semibold text-brand-700">{text(`+${money(tip.monthlyImpact)}/мес`)}</span>
                         )}
                         {tip.impactLabel && <span className="rounded-full bg-gray-100 px-2.5 py-1 text-[12px] font-semibold text-ink-soft">⏱ {tip.impactLabel}</span>}
                       </div>
@@ -131,9 +134,25 @@ export default function AdvisorPanel({ advice, goal }) {
               </Card>
             );
           })}
-          {advice.tips.length > VISIBLE_TIPS && (
-            <button onClick={() => setAllTips((v) => !v)} className="pressable h-11 w-full rounded-2xl bg-white text-sm font-semibold text-brand-700 shadow-card">
-              {allTips ? 'Свернуть советы' : `Ещё советы · ${advice.tips.length - VISIBLE_TIPS}`}
+          {unlocked.length > VISIBLE_TIPS && (
+            <button onClick={() => setAllTips((v) => !v)} className="pressable h-11 w-full rounded-2xl bg-surface text-sm font-semibold text-brand-700 shadow-card">
+              {allTips ? 'Свернуть советы' : `Ещё советы · ${unlocked.length - VISIBLE_TIPS}`}
+            </button>
+          )}
+          {lockedCount > 0 && (
+            <button
+              onClick={() => openPaywall('strategist')}
+              className="pressable flex w-full items-center gap-3 rounded-3xl bg-surface p-4 text-left shadow-card"
+              data-testid="locked-insights"
+            >
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-amber-50 text-amber-700">
+                <Lock size={17} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[15px] font-semibold">Ещё {plural(lockedCount, ['совет', 'совета', 'советов'])}</span>
+                <span className="block text-[13px] text-ink-muted">Все советы стратега — в Private Membership</span>
+              </span>
+              <span className="rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-700 ring-1 ring-amber-500/40">Private</span>
             </button>
           )}
         </div>
@@ -147,12 +166,26 @@ export default function AdvisorPanel({ advice, goal }) {
 /** Появляется, только если в Профиле указан ключ API. */
 function AIAdviceCard({ goal }) {
   const { settings, transactions } = useFinance();
+  const { isPrivate, openPaywall } = useSubscription();
+  const { text } = usePrivacy();
   const [state, setState] = useState({ status: 'idle', text: '', error: '' });
   const abortRef = useRef(null);
   useEffect(() => () => abortRef.current?.abort(), []);
   useEffect(() => setState({ status: 'idle', text: '', error: '' }), [goal.id]);
 
   if (!settings.aiApiKey) return null;
+  if (!isPrivate) {
+    return (
+      <button onClick={() => openPaywall('aiAdvisor')} className="pressable flex w-full items-center gap-3 rounded-3xl bg-surface p-4 text-left shadow-card">
+        <Bot size={18} className="shrink-0 text-amber-700" />
+        <span className="min-w-0 flex-1">
+          <span className="block text-[15px] font-semibold">ИИ-разбор капитала</span>
+          <span className="block text-[13px] text-ink-muted">Доступен в Private Membership</span>
+        </span>
+        <Lock size={16} className="shrink-0 text-ink-muted" />
+      </button>
+    );
+  }
 
   const ask = async () => {
     abortRef.current?.abort();
@@ -172,11 +205,11 @@ function AIAdviceCard({ goal }) {
     <Card className="p-4">
       <div className="flex items-center gap-2">
         <Bot size={18} className="text-brand-600" />
-        <h3 className="flex-1 text-[15px] font-bold">Совет от ИИ</h3>
+        <h3 className="flex-1 text-[15px] font-semibold">ИИ-разбор капитала</h3>
         <button
           onClick={ask}
           disabled={state.status === 'loading'}
-          className="flex h-9 items-center gap-1.5 rounded-full bg-ink px-3.5 text-[13px] font-semibold text-white disabled:opacity-60"
+          className="flex h-9 items-center gap-1.5 rounded-full bg-ink px-3.5 text-[13px] font-semibold text-on-ink disabled:opacity-60"
         >
           {state.status === 'loading' && <Loader2 size={14} className="animate-spin" />}
           {state.status === 'done' ? 'Обновить' : state.status === 'loading' ? 'Анализирую…' : 'Спросить'}
@@ -184,7 +217,7 @@ function AIAdviceCard({ goal }) {
       </div>
       {state.status === 'idle' && <p className="mt-2 text-[13px] text-ink-muted">Операции за последние 60 дней будут отправлены модели для персонального разбора.</p>}
       {state.status === 'error' && <p className="mt-2 rounded-xl bg-red-50 px-3 py-2 text-[13px] text-red-700">{state.error}</p>}
-      {state.text && <div className="mt-3 whitespace-pre-line text-sm leading-relaxed text-ink-soft">{state.text}</div>}
+      {state.text && <div className="mt-3 whitespace-pre-line text-sm leading-relaxed text-ink-soft">{text(state.text)}</div>}
     </Card>
   );
 }

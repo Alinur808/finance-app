@@ -1,11 +1,13 @@
 import { ChevronRight, Flame } from 'lucide-react';
-import { formatMoney, formatPercent } from '../utils/format.js';
+import { usePrivacy } from '../hooks/usePrivacy.js';
+import { formatPercent } from '../utils/format.js';
 import CategoryIcon from './CategoryIcon.jsx';
 import { Card } from './ui.jsx';
 
 /** Compact "where did my money go" widget for the Overview. */
 export default function TopSpending({ breakdown, total, onOpen, onPick }) {
   const top = breakdown.slice(0, 3);
+  const { money } = usePrivacy();
   if (!top.length) return null;
   const leader = top[0];
   return (
@@ -15,7 +17,7 @@ export default function TopSpending({ breakdown, total, onOpen, onPick }) {
           <span className="grid h-7 w-7 place-items-center rounded-full bg-orange-50 text-orange-500">
             <Flame size={15} />
           </span>
-          <h2 className="text-[15px] font-bold">Больше всего трат</h2>
+          <h2 className="text-[15px] font-semibold">Больше всего трат</h2>
         </div>
         <span className="flex items-center text-sm font-semibold text-brand-600">
           Аналитика <ChevronRight size={16} />
@@ -29,7 +31,7 @@ export default function TopSpending({ breakdown, total, onOpen, onPick }) {
         ))}
       </div>
       <p className="mb-3 text-[12px] text-ink-muted">
-        «{leader.category.name}» — {formatPercent(leader.share)} от {formatMoney(total)}
+        «{leader.category.name}» — {formatPercent(leader.share)} от {money(total)}
       </p>
 
       <div className="space-y-1">
@@ -42,7 +44,7 @@ export default function TopSpending({ breakdown, total, onOpen, onPick }) {
                   <span className="mr-1 text-ink-muted">{i + 1}.</span>
                   {c.category.name}
                 </p>
-                <p className="tabular shrink-0 text-sm font-bold">{formatMoney(c.amount)}</p>
+                <p className="tabular shrink-0 text-sm font-semibold">{money(c.amount)}</p>
               </div>
               <div className="mt-1 flex items-center gap-2">
                 <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-100">

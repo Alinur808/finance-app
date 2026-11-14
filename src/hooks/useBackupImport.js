@@ -1,10 +1,25 @@
 import { useCallback, useRef, useState } from 'react';
 import { useFinance } from '../context/FinanceContext.jsx';
+import { useSecurity } from '../context/SecurityContext.jsx';
+import { useSubscription } from '../context/SubscriptionContext.jsx';
 import { readImportFile } from '../utils/backup.js';
+import { dayKey } from '../utils/dates.js';
 import { plural } from '../utils/format.js';
+import { haptic } from '../utils/haptics.js';
 
 const TX_WORDS = ['операция', 'операции', 'операций'];
 const DEFAULT_ACCEPT = '.json,.pdf,application/json,application/pdf';
+
+/**
+ * Нужна ли «история выписок» (Private): на устройстве уже есть операции из
+ * выписки Freedom за другой период, и новая выписка добавит ещё один.
+ * Первая выписка и повторная загрузка того же периода — бесплатно.
+ */
+export function needsStatementHistory(transactions, statement) {
+  const { from, to } = statement.period ?? {};
+  if (!from || !to) return false;
+  return transactions.some((t) => t.source === 'freedom-pdf' && (dayKey(t.date) < from || dayKey(t.date) > to));
+}
 
 /**
  * Общая логика «Импорт данных» для Профиля и пустого дашборда.
@@ -22,7 +37,9 @@ const DEFAULT_ACCEPT = '.json,.pdf,application/json,application/pdf';
  * (используется, когда данных ещё нет и заменять нечего).
  */
 export function useBackupImport({ toast, autoConfirm = false } = {}) {
-  const { importData, importStatement } = useFinance();
+  const { importData, importStatement, transactions } = useFinance();
+  const { isPrivate, openPaywall } = useSubscription();
+  const { pauseAutoLock } = useSecurity();
   const inputRef = useRef(null);
   const [pending, setPending] = useState(null);
   const [error, setError] = useState('');
@@ -37,6 +54,7 @@ export function useBackupImport({ toast, autoConfirm = false } = {}) {
         importData(data);
         toast?.(`Импортировано: ${plural(data.transactions.length, TX_WORDS)}`);
       }
+      haptic('success');
       setPending(null);
     },
     [importData, importStatement, toast],
@@ -51,6 +69,12 @@ export function useBackupImport({ toast, autoConfirm = false } = {}) {
       setBusy(/\.pdf$/i.test(file.name) || file.type === 'application/pdf' ? 'parsing-pdf' : 'reading');
       try {
         const data = await readImportFile(file);
+        if (data.kind === 'statement' && !isPrivate && needsStatementHistory(transactions, data)) {
+          setPending(null);
+          setError('На устройстве уже есть выписка за другой период. Хранить выписки за несколько месяцев можно в Private Membership — или загрузите выписку за тот же период.');
+          openPaywall('statementHistory');
+          return;
+        }
         if (autoConfirm) apply(data);
         else setPending(data);
       } catch (err) {
@@ -61,7 +85,7 @@ export function useBackupImport({ toast, autoConfirm = false } = {}) {
         setBusy(null);
       }
     },
-    [autoConfirm, apply],
+    [autoConfirm, apply, isPrivate, transactions, openPaywall],
   );
 
   return {
@@ -69,6 +93,7 @@ export function useBackupImport({ toast, autoConfirm = false } = {}) {
     openPicker: (accept = DEFAULT_ACCEPT) => {
       if (!inputRef.current) return;
       inputRef.current.accept = typeof accept === 'string' ? accept : DEFAULT_ACCEPT; // onClick передаёт событие
+      pauseAutoLock(); // системный выбор файла уводит страницу в фон — не блокируемся
       inputRef.current.click();
     },
     inputProps: {

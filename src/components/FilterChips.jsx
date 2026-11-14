@@ -15,7 +15,7 @@ function Chip({ active, onClick, children }) {
     <button
       onClick={onClick}
       className={`pressable flex h-9 max-w-[60vw] shrink-0 items-center gap-1 rounded-full px-3.5 text-sm font-semibold ${
-        active ? 'bg-ink text-white' : 'bg-white text-ink-soft shadow-card ring-1 ring-black/[0.03]'
+        active ? 'bg-ink text-on-ink' : 'bg-surface text-ink-soft shadow-card'
       }`}
     >
       <span className="truncate">{children}</span>

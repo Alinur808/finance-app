@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
+import { usePrivacy } from '../../hooks/usePrivacy.js';
 import { formatMoney, groupDigits } from '../../utils/format.js';
 import BottomSheet from '../BottomSheet.jsx';
 import { PrimaryButton } from '../ui.jsx';
 
 export default function ContributeSheet({ goal, open, onClose, onConfirm }) {
   const [amount, setAmount] = useState(0);
+  const { money } = usePrivacy();
   useEffect(() => {
     if (open) setAmount(0);
   }, [open]);
@@ -23,7 +25,7 @@ export default function ContributeSheet({ goal, open, onClose, onConfirm }) {
         </PrimaryButton>
       }
     >
-      <p className="text-sm text-ink-muted">Осталось {formatMoney(left)}</p>
+      <p className="text-sm text-ink-muted">Осталось {money(left)}</p>
       <div className="mt-3 flex h-16 items-center rounded-2xl bg-gray-100 px-4 focus-within:ring-2 focus-within:ring-brand-500">
         <input
           autoFocus
@@ -37,11 +39,15 @@ export default function ContributeSheet({ goal, open, onClose, onConfirm }) {
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
         {quick.map((v) => (
-          <button key={v} onClick={() => setAmount(v)} className={`h-10 rounded-full px-4 text-sm font-semibold ${amount === v ? 'bg-ink text-white' : 'bg-gray-100 text-ink-soft'}`}>
+          <button
+            key={v}
+            onClick={() => setAmount(v)}
+            className={`h-10 rounded-full px-4 text-sm font-semibold ${amount === v ? 'bg-ink text-on-ink' : 'bg-gray-100 text-ink-soft'}`}
+          >
             +{groupDigits(v)} ₸
           </button>
         ))}
-        <button onClick={() => setAmount(left)} className={`h-10 rounded-full px-4 text-sm font-semibold ${amount === left ? 'bg-ink text-white' : 'bg-gray-100 text-ink-soft'}`}>
+        <button onClick={() => setAmount(left)} className={`h-10 rounded-full px-4 text-sm font-semibold ${amount === left ? 'bg-ink text-on-ink' : 'bg-gray-100 text-ink-soft'}`}>
           Всю сумму
         </button>
       </div>

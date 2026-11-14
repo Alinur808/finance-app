@@ -33,8 +33,7 @@ export function monthlyProfile(transactions, now = new Date()) {
 }
 
 /** Сколько недель копить `remaining` при заданном темпе в месяц (Infinity, если темп ≤ 0). */
-export const weeksToSave = (remaining, monthlySavings) =>
-  remaining <= 0 ? 0 : monthlySavings > 0 ? remaining / (monthlySavings / WEEKS_PER_MONTH) : Infinity;
+export const weeksToSave = (remaining, monthlySavings) => (remaining <= 0 ? 0 : monthlySavings > 0 ? remaining / (monthlySavings / WEEKS_PER_MONTH) : Infinity);
 
 /** 2 → "2 недели", 0.5 → "4 дня", 14 → "3,2 месяца" */
 export const describeWeeks = (weeks) => {
@@ -47,7 +46,7 @@ export const describeWeeks = (weeks) => {
 };
 
 const fasterBy = (before, after) => {
-  if (!Number.isFinite(before)) return Number.isFinite(after) ? `цель станет достижима за ${describeWeeks(after)}` : null;
+  if (!Number.isFinite(before)) return Number.isFinite(after) ? `достижима за ${describeWeeks(after)}` : null;
   const diff = before - after;
   if (diff <= 0) return null;
   return `на ${describeWeeks(diff)} быстрее`;
@@ -84,7 +83,6 @@ export function buildAdvice(transactions, goal, now = new Date()) {
     return { profile: p, remaining, savingsRate, requiredMonthly, shortfall, baseWeeks, weeksLeft, eta, status, tips: [], discretionary: [] };
   }
 
-  const goalLabel = money(goal.target, { compact: true });
   const tips = [];
   const withImpact = (saving) => fasterBy(baseWeeks, weeksToSave(remaining, p.savings + saving));
 
@@ -98,8 +96,8 @@ export function buildAdvice(transactions, goal, now = new Date()) {
       id: 'top-category',
       kind: 'category',
       categoryId: top.id,
-      title: `«${top.category.name}» — ваша главная гибкая статья`,
-      text: `Вы тратите ${formatPercent(top.monthly / p.expense)} бюджета на ${top.category.nameAcc} (~${money(top.monthly)} в месяц). Сократите эти расходы вдвое, и вы накопите ${goalLabel} ${faster ?? 'быстрее'}.`,
+      title: `«${top.category.name}» — ${formatPercent(top.monthly / p.expense)} ваших расходов`,
+      text: `Около ${money(top.monthly)} в месяц. Тратьте вдвое меньше — освободится ${money(cut)} в месяц.${faster ? ` Цель — ${faster}.` : ''}`,
       monthlyImpact: cut,
       impactLabel: faster,
     });
@@ -115,8 +113,8 @@ export function buildAdvice(transactions, goal, now = new Date()) {
       id: 'delivery',
       kind: 'habit',
       categoryId: 'delivery',
-      title: 'Готовьте дома чаще',
-      text: `Около ${plural(Math.round(perMonth), ['заказа', 'заказов', 'заказов'])} доставки в месяц со средним чеком ${money(avg)}. Если треть из них заменить домашней едой, вы сэкономите ~${money(saving)} в месяц.`,
+      title: 'Доставка еды',
+      text: `${plural(Math.round(perMonth), ['заказ', 'заказа', 'заказов'])} в месяц, в среднем по ${money(avg)}. Заказывайте на треть реже — и это +${money(saving)} в месяц.`,
       monthlyImpact: saving,
       impactLabel: withImpact(saving),
     });
@@ -132,8 +130,8 @@ export function buildAdvice(transactions, goal, now = new Date()) {
       id: 'taxi',
       kind: 'habit',
       categoryId: 'taxi',
-      title: 'Пересядьте на метро',
-      text: `Примерно ${plural(Math.round(perMonth), ['поездка', 'поездки', 'поездок'])} на такси в месяц, в среднем по ${money(avg)}. Половину можно заменить метро или автобусом (~${groupDigits(PUBLIC_TRANSPORT_FARE)} ₸) и сэкономить ~${money(saving)} в месяц.`,
+      title: 'Такси или метро',
+      text: `${plural(Math.round(perMonth), ['поездка', 'поездки', 'поездок'])} на такси в месяц, по ${money(avg)}. Половину — на метро (~${groupDigits(PUBLIC_TRANSPORT_FARE)} ₸), и это +${money(saving)} в месяц.`,
       monthlyImpact: saving,
       impactLabel: withImpact(saving),
     });
@@ -147,8 +145,8 @@ export function buildAdvice(transactions, goal, now = new Date()) {
     tips.push({
       id: 'small',
       kind: 'habit',
-      title: 'Мелкие покупки складываются',
-      text: `${plural(Math.round(small.length * p.scale), ['покупка', 'покупки', 'покупок'])} дешевле 3 000 ₸ обходятся в ${money(monthly)} в месяц. Лимит ${money(Math.round((monthly * 0.7) / WEEKS_PER_MONTH / 500) * 500)} в неделю сэкономит ~${money(saving)}.`,
+      title: 'Мелкие покупки до 3 000 ₸',
+      text: `${plural(Math.round(small.length * p.scale), ['покупка', 'покупки', 'покупок'])} в месяц на ${money(monthly)}. Лимит ${money(Math.round((monthly * 0.7) / WEEKS_PER_MONTH / 500) * 500)} в неделю — и +${money(saving)} в месяц.`,
       monthlyImpact: saving,
       impactLabel: withImpact(saving),
     });
@@ -163,7 +161,7 @@ export function buildAdvice(transactions, goal, now = new Date()) {
       kind: 'rule',
       categoryId: 'fees',
       title: 'Комиссии за переводы',
-      text: `${plural(fees.length, ['перевод', 'перевода', 'переводов'])} в другие банки стоили ${money(fees.reduce((s, t) => s + t.amount, 0))}. Переводите внутри своего банка по номеру телефона — обычно это бесплатно.`,
+      text: `${plural(fees.length, ['перевод', 'перевода', 'переводов'])} в другие банки — ${money(fees.reduce((s, t) => s + t.amount, 0))} комиссий. Внутри своего банка переводы обычно бесплатны.`,
       monthlyImpact: monthly,
       impactLabel: null,
     });
@@ -175,8 +173,8 @@ export function buildAdvice(transactions, goal, now = new Date()) {
     tips.push({
       id: 'rate',
       kind: 'rule',
-      title: `Вы откладываете ${formatPercent(Math.max(0, savingsRate))} дохода`,
-      text: `По правилу 50/30/20 стоит откладывать 20% — для вас это ${money(p.income * 0.2)} в месяц, на ${money(gap)} больше, чем сейчас.`,
+      title: `Откладываете ${formatPercent(Math.max(0, savingsRate))} дохода — меньше 20%`,
+      text: `20% дохода — это ${money(p.income * 0.2)} в месяц. Не хватает ${money(gap)} в месяц.`,
       monthlyImpact: gap,
       impactLabel: fasterBy(baseWeeks, weeksToSave(remaining, p.income * 0.2)),
     });
@@ -191,8 +189,8 @@ export function buildAdvice(transactions, goal, now = new Date()) {
     tips.push({
       id: 'autosave',
       kind: 'action',
-      title: 'Сначала заплатите себе',
-      text: `Настройте автоперевод ${groupDigits(Math.ceil(requiredMonthly / 1000) * 1000)} ₸ в месяц на депозит или накопительный счёт сразу после поступления денег — так вы соберёте «${goal.name}» к ${formatFullDate(deadline)}.`,
+      title: 'Сначала — себе',
+      text: `Автоперевод ${groupDigits(Math.ceil(requiredMonthly / 1000) * 1000)} ₸ в месяц на депозит в день зарплаты — и «${goal.name}» будет к ${formatFullDate(deadline)}.`,
       monthlyImpact: 0,
       impactLabel: null,
     });
@@ -255,10 +253,11 @@ export function buildLLMPayload(transactions, goal, now = new Date()) {
   };
 }
 
-const SYSTEM_PROMPT = `Ты — внимательный финансовый советник в мобильном банковском приложении в Казахстане.
-Пользователь копит на цель. Тебе дают короткую сводку и JSON: цель, средний месячный доход и расходы, расходы по категориям и список операций в тенге (₸).
-Дай 3–5 конкретных советов на русском языке, как быстрее достичь цели. Для каждого совета укажи, сколько тенге в месяц он освобождает и на сколько недель приближает цель (считай от текущего темпа накоплений).
-Опирайся только на данные; не придумывай операции. Пиши коротко и дружелюбно, без воды. Суммы пиши в формате «12 500 ₸».`;
+const SYSTEM_PROMPT = `Ты — опытный личный финансовый советник. Клиент в Казахстане копит на цель; тебе дают сводку и JSON: цель, средние доходы и расходы в месяц, расходы по категориям и операции в тенге (₸).
+Ответ на русском, коротко и по делу, без вступлений:
+1) Одна строка — главное: сколько уходит в месяц, какую долю дохода клиент откладывает и на что тратит больше всего.
+2) 3–5 действий, самые полезные первыми. Каждое — одна строка: что сделать → сколько ₸ в месяц это освободит → на сколько недель раньше будет цель (от нынешнего темпа).
+Пиши простым живым языком, без банковских терминов и англицизмов. Опирайся только на данные, не придумывай операции. Суммы — в формате «12 500 ₸».`;
 
 /**
  * Текст сообщения пользователя: несколько готовых фраз + JSON.

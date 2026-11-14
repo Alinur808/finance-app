@@ -3,7 +3,8 @@ import { ChevronRight, Trash2 } from 'lucide-react';
 import { useAccounts } from '../hooks/useAccounts.js';
 import { categoryList, getCategory } from '../data/categories.js';
 import { formatShortDate, formatTime } from '../utils/dates.js';
-import { formatOriginal, formatTxAmount } from '../utils/format.js';
+import { formatOriginal, formatTxAmount, maskMoneyInText, MONEY_MASK } from '../utils/format.js';
+import { usePrivacy } from '../hooks/usePrivacy.js';
 import BottomSheet from './BottomSheet.jsx';
 import CategoryIcon from './CategoryIcon.jsx';
 
@@ -12,6 +13,7 @@ export default function TransactionDetailSheet({ tx, onClose, onDelete, onChange
   const { getAccount } = useAccounts();
   const [picking, setPicking] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const { hidden } = usePrivacy();
   useEffect(() => {
     setPicking(false);
     setConfirmDelete(false);
@@ -22,7 +24,7 @@ export default function TransactionDetailSheet({ tx, onClose, onDelete, onChange
   const acc = getAccount(tx.accountId);
   const rows = [
     ['Описание', tx.merchant || '—'],
-    ...(tx.original ? [['Сумма в валюте', formatOriginal(tx.original)]] : []),
+    ...(tx.original ? [['Сумма в валюте', hidden ? `•••• ${tx.original.currency}` : formatOriginal(tx.original)]] : []),
     ['Счёт', acc.name],
     ['Дата', tx.noTime ? formatShortDate(tx.date) : `${formatShortDate(tx.date)}, ${formatTime(tx.date)}`],
     ...(tx.pending ? [['Статус', 'В обработке']] : []),
@@ -35,7 +37,7 @@ export default function TransactionDetailSheet({ tx, onClose, onDelete, onChange
     <BottomSheet open onClose={onClose} title={tx.type === 'income' ? 'Доход' : 'Расход'}>
       <div className="flex flex-col items-center py-3">
         <CategoryIcon categoryId={tx.categoryId} size={64} />
-        <p className={`mt-3 text-[32px] font-extrabold tracking-tight ${tx.type === 'income' ? 'text-brand-600' : ''}`}>{formatTxAmount(tx)}</p>
+        <p className={`mt-3 text-[32px] font-extrabold tracking-tight ${tx.type === 'income' ? 'text-brand-600' : ''}`}>{hidden ? MONEY_MASK : formatTxAmount(tx)}</p>
         <p className="max-w-full truncate text-center text-sm text-ink-muted">{tx.merchant || cat.name}</p>
       </div>
 
@@ -69,7 +71,7 @@ export default function TransactionDetailSheet({ tx, onClose, onDelete, onChange
         </div>
       )}
 
-      <dl className="mt-2 divide-y divide-gray-100 rounded-2xl bg-gray-50">
+      <dl className="mt-2 divide-y divide-hairline rounded-2xl bg-gray-50">
         {rows.map(([k, v]) => (
           <div key={k} className="flex justify-between gap-4 px-4 py-3 text-sm">
             <dt className="shrink-0 text-ink-muted">{k}</dt>
@@ -77,7 +79,11 @@ export default function TransactionDetailSheet({ tx, onClose, onDelete, onChange
           </div>
         ))}
       </dl>
-      {tx.note && tx.source === 'freedom-pdf' && <p className="mt-3 rounded-2xl bg-gray-50 px-4 py-3 text-[13px] leading-snug text-ink-soft">{tx.note}</p>}
+      {tx.note && tx.source === 'freedom-pdf' && (
+        <p className="mt-3 rounded-2xl bg-gray-50 px-4 py-3 text-[13px] leading-snug text-ink-soft">
+          {hidden ? maskMoneyInText(tx.note).replace(/[\d.,]+\s(AED|USD|EUR|RUB)/g, '•••• $1') : tx.note}
+        </p>
+      )}
       {tx.noTime && <p className="mt-3 px-1 text-[12px] text-ink-muted">Из банковской выписки — время операции в ней не указано.</p>}
 
       <button

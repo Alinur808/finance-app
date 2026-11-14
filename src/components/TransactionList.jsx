@@ -1,27 +1,28 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { getCategory } from '../data/categories.js';
 import { formatGroupLabel, formatTime } from '../utils/dates.js';
-import { formatMoney, formatOriginal, formatTxAmount } from '../utils/format.js';
+import { formatMoney, formatOriginal, formatTxAmount, MONEY_MASK } from '../utils/format.js';
 import { groupByDay } from '../utils/analytics.js';
+import { usePrivacy } from '../hooks/usePrivacy.js';
 import CategoryIcon from './CategoryIcon.jsx';
 
 const PAGE = 40;
 
-export const TransactionRow = memo(function TransactionRow({ tx, accountName, onClick }) {
+export const TransactionRow = memo(function TransactionRow({ tx, accountName, onClick, hidden = false }) {
   const cat = getCategory(tx.categoryId);
   const income = tx.type === 'income';
-  const meta = [tx.original ? formatOriginal(tx.original) : tx.noTime ? '' : formatTime(tx.date), tx.pending ? 'в обработке' : '']
+  const meta = [tx.original ? (hidden ? `•••• ${tx.original.currency}` : formatOriginal(tx.original)) : tx.noTime ? '' : formatTime(tx.date), tx.pending ? 'в обработке' : '']
     .filter(Boolean)
     .join(' · ');
   return (
-    <button onClick={() => onClick?.(tx)} className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors active:bg-gray-50">
+    <button onClick={() => onClick?.(tx)} className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors active:bg-gray-100">
       <CategoryIcon categoryId={tx.categoryId} />
       <div className="min-w-0 flex-1">
         <p className="truncate text-[15px] font-semibold text-ink">{tx.merchant || cat.name}</p>
         <p className="truncate text-[13px] text-ink-muted">{tx.merchant ? cat.name : accountName}</p>
       </div>
       <div className="shrink-0 text-right">
-        <p className={`whitespace-nowrap text-[15px] font-bold ${income ? 'text-brand-600' : 'text-ink'}`}>{formatTxAmount(tx)}</p>
+        <p className={`tabular whitespace-nowrap text-[15px] font-semibold ${income ? 'text-brand-600' : 'text-ink'}`}>{hidden ? MONEY_MASK : formatTxAmount(tx)}</p>
         {meta && <p className="whitespace-nowrap text-[12px] text-ink-muted">{meta}</p>}
       </div>
     </button>
@@ -35,6 +36,7 @@ export const TransactionRow = memo(function TransactionRow({ tx, accountName, on
  */
 export default function TransactionList({ transactions, onSelect, now, accountName }) {
   const [limit, setLimit] = useState(PAGE);
+  const { hidden } = usePrivacy();
   const sentinel = useRef(null);
 
   // новый набор операций (фильтр, импорт) — снова с первых 40
@@ -67,11 +69,11 @@ export default function TransactionList({ transactions, onSelect, now, accountNa
                 {label}
                 {hint && <span className="text-ink-muted"> · {hint}</span>}
               </h3>
-              <span className="text-[12px] font-medium text-ink-muted">{formatMoney(dayTotals.get(g.key) ?? 0, { sign: true })}</span>
+              <span className="tabular text-[12px] font-medium text-ink-muted">{hidden ? MONEY_MASK : formatMoney(dayTotals.get(g.key) ?? 0, { sign: true })}</span>
             </div>
-            <div className="divide-y divide-gray-100 overflow-hidden rounded-3xl bg-white shadow-card ring-1 ring-black/[0.03]">
+            <div className="divide-y divide-hairline overflow-hidden rounded-3xl bg-surface shadow-card">
               {g.items.map((tx) => (
-                <TransactionRow key={tx.id} tx={tx} accountName={accountName} onClick={onSelect} />
+                <TransactionRow key={tx.id} tx={tx} accountName={accountName} onClick={onSelect} hidden={hidden} />
               ))}
             </div>
           </section>
@@ -79,7 +81,7 @@ export default function TransactionList({ transactions, onSelect, now, accountNa
       })}
       {hasMore && (
         <div ref={sentinel} className="flex justify-center py-2">
-          <button onClick={() => setLimit((l) => l + PAGE)} className="pressable h-11 rounded-full bg-white px-5 text-sm font-semibold text-brand-700 shadow-card">
+          <button onClick={() => setLimit((l) => l + PAGE)} className="pressable h-11 rounded-full bg-surface px-5 text-sm font-semibold text-brand-700 shadow-card">
             Показать ещё · {transactions.length - limit}
           </button>
         </div>

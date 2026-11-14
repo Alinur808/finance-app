@@ -5,7 +5,7 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import { viteSingleFile } from 'vite-plugin-singlefile';
 
-const THEME = '#0a5a3c';
+const THEME = '#050507'; // Obsidian
 
 // Выписка с личными данными не хранится в git (см. .gitignore). Если файла нет —
 // например, при сборке на GitHub Actions — подставляем пустую выписку.
@@ -23,6 +23,12 @@ const EMPTY_STATEMENT = fileURLToPath(new URL('./src/data/statement.empty.json',
  */
 export default defineConfig(({ mode }) => ({
   base: './',
+  build: {
+    // pdf.js (~540 КБ) и его воркер грузятся лениво — только при выборе PDF,
+    // на старт приложения не влияют. Порог поднят, чтобы предупреждение
+    // не заглушало настоящие проблемы.
+    chunkSizeWarningLimit: 1400,
+  },
   // воркер pdf.js собирается как классический (iife) .js — без требований к module-воркерам
   worker: { format: 'iife' },
   resolve: {
@@ -40,7 +46,7 @@ export default defineConfig(({ mode }) => ({
           manifest: {
             name: 'Финансы',
             short_name: 'Финансы',
-            description: 'Личные финансы: баланс, аналитика расходов, цели и советник.',
+            description: 'Личные финансы: баланс, денежный поток, цели и стратег.',
             lang: 'ru',
             id: './',
             start_url: './',
@@ -48,7 +54,7 @@ export default defineConfig(({ mode }) => ({
             display: 'standalone',
             orientation: 'portrait',
             theme_color: THEME,
-            background_color: '#f3f4f6',
+            background_color: '#050507',
             icons: [
               { src: './pwa-192x192.png', sizes: '192x192', type: 'image/png' },
               { src: './pwa-512x512.png', sizes: '512x512', type: 'image/png' },
@@ -59,18 +65,6 @@ export default defineConfig(({ mode }) => ({
             globPatterns: ['**/*.{js,mjs,css,html,svg,png,woff2}'],
             maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, // воркер pdf.js ~1,3 МБ
             navigateFallback: 'index.html',
-            runtimeCaching: [
-              {
-                // шрифт Inter: работает и без сети после первого запуска
-                urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/i,
-                handler: 'CacheFirst',
-                options: {
-                  cacheName: 'google-fonts',
-                  expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 365 },
-                  cacheableResponse: { statuses: [0, 200] },
-                },
-              },
-            ],
           },
         }),
   ],

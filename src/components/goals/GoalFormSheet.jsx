@@ -82,7 +82,11 @@ export default function GoalFormSheet({ open, goal, template, onClose, onSave, o
         </label>
         <div className="flex flex-wrap gap-2">
           {[300000, 500000, 1000000, 2000000].map((v) => (
-            <button key={v} onClick={() => set({ target: v })} className={`h-9 rounded-full px-3.5 text-sm font-semibold ${form.target === v ? 'bg-ink text-white' : 'bg-gray-100 text-ink-soft'}`}>
+            <button
+              key={v}
+              onClick={() => set({ target: v })}
+              className={`h-9 rounded-full px-3.5 text-sm font-semibold ${form.target === v ? 'bg-ink text-on-ink' : 'bg-gray-100 text-ink-soft'}`}
+            >
               {groupDigits(v)} ₸
             </button>
           ))}

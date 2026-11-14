@@ -11,6 +11,8 @@ npm run build:public   # PWA build with NO bank data, safe to host publicly
 npm run build:single   # one self-contained dist/index.html (no service worker)
 npm run preview        # serve dist/ on your LAN (for testing on the phone)
 npm run icons          # re-render PNG icons from public/icon.svg
+npm run test:e2e       # Playwright suite on a 390×844 mobile viewport (builds build:public first)
+npm run fixture:freedom  # regenerate the synthetic Freedom PDF used by the import test (needs reportlab)
 ```
 
 ## Updating the statement
@@ -48,17 +50,55 @@ The workflow runs `npm run build:public`, so the published site contains no bank
 1. Open `https://alinur808.github.io/finance-app/` in Safari, tap **Share**, then **Add to Home Screen**. The app opens full-screen without the Safari interface and works offline.
 2. In the app, go to **Профиль → Импорт данных** and choose a backup exported from your local build. That loads your transactions, goals and balance on the phone.
 
+## Design system: Obsidian & Alabaster
+Colours are CSS variables in `src/index.css` (`R G B` triplets), mapped in `tailwind.config.js`, so the same classes (`bg-surface`, `text-ink-muted`, `bg-red-50`…) work in both themes. **Obsidian** (default) is an OLED dark theme: `#050507` canvas, `#0E1015` surfaces, 8 % white hairlines, emerald `#10B981` for income and coral for spending. **Alabaster** is the daylight theme. The theme lives in `localStorage['tenge-finance.theme']` (device preference, not part of backups); an inline script in `index.html` applies it before first paint. Inter is self-hosted (`@fontsource-variable/inter`), so it works offline and inside Capacitor. All numbers use tabular figures; balances use `FitText`, which shrinks the font so anything from `0 ₸` to `999 999 999 999 ₸` fits on one line.
+
+## Privacy & security
+- **Stealth Mode** — the eye on the balance card (or Профиль → Приватность). Every amount on Обзор, Аналитика and Планы becomes `•••••• ₸`; charts stay usable. It reuses the existing `settings.hideBalance` flag, so old data and backups work unchanged (`src/hooks/usePrivacy.js`).
+- **Passcode Lock** — Профиль → Защита код-паролем (Private). Locks on cold open and whenever the app goes to the background (`visibilitychange`); system pickers (file import, share sheet) pause auto-lock. Only a salted, iterated SHA-256 hash is stored (`localStorage['tenge-finance.security']`), never in backups. Five wrong attempts → 30 s cooldown. «Забыли код?» offers a full device reset. Face ID / Touch ID: install a Capacitor plugin with the `capacitor-native-biometric` API and the lock screen shows the Face ID button automatically (`src/native/biometrics.js`).
+
+## Membership (Standard / Private)
+`src/context/SubscriptionContext.jsx` gates features; plans and limits live in `src/data/membership.js`.
+
+| | Standard (free) | Private |
+|---|---|---|
+| Manual tracking, analytics, cash-flow chart, Stealth Mode | ✓ | ✓ |
+| First Freedom PDF import (and re-importing the same period) | ✓ | ✓ |
+| Strategist insights | 2 | unlimited |
+| AI capital review (Claude, own API key) | — | ✓ |
+| Statements for several periods | — | ✓ |
+| Financial Diary goals | 3 | unlimited |
+| Passcode Lock | — | ✓ |
+
+Limits never delete existing data: users who already have more diary goals keep them, and an existing passcode keeps working after a downgrade. In the web build, «Режим подписки (Preview)» in Профиль switches tiers and «purchases» activate Private locally without charging. In Capacitor, install `@revenuecat/purchases-capacitor`, call `configureBilling({ apiKey })` from `src/native/billing.js` at startup, and create products `private_monthly`, `private_annual`, `private_lifetime` attached to the entitlement `private`. The preview toggle hides itself once the store plugin is present.
+
+## Native packaging (Capacitor)
+`dist/` is ready to wrap: paths are relative (`base: './'`), fonts are bundled, and native features (haptics, biometrics, purchases) are looked up at runtime through `window.Capacitor.Plugins` (`src/native/bridge.js`), so the web build has no native dependencies. `capacitor.config.json` is a starting point; change `appId` to your own bundle id before the first `cap add`.
+```bash
+npm i @capacitor/core @capacitor/cli @capacitor/ios @capacitor/android @capacitor/haptics
+npm run build:public && npx cap add ios && npx cap add android && npx cap sync
+```
+
+## Tests
+`npm run test:e2e` runs Playwright on a 390×844 viewport with an iPhone user agent: billion-scale balances without overflow, Stealth Mode, theme switching, the paywall, Passcode Lock (setup, cold open, background), cash-flow scrubbing, 16 px inputs, legacy data and JSON backup import. The PDF test simulates iOS Safari by deleting `Promise.withResolvers` and the `ReadableStream` async iterator on the page **and inside the pdf.js worker** before they load, then imports a Freedom statement. By default it uses a synthetic statement (208 rows, closing balance 14 234,77 ₸) generated by `tests/fixtures/make_freedom_fixture.py`; to check your own statement:
+```bash
+FREEDOM_PDF=~/Downloads/statement.pdf FREEDOM_ROWS=208 FREEDOM_BALANCE="14 234,77" npm run test:e2e
+```
+
 ## Structure
 ```
 src/
   data/        categories (pastel icon colours), accounts, statement.json, seed loader
   utils/       dates/periods (ru), money formatting (ru), analytics, advisor, backup
-  context/     FinanceContext: reducer + localStorage persistence
-  components/  BalanceCard (Kaspi Gold card), FilterChips, TransactionList, charts, sheets, goals/*
+  context/     FinanceContext (reducer + localStorage), Theme, Subscription, Security
+  components/  BalanceCard, CashflowChart, FilterChips, TransactionList, sheets, goals/*, security/*, membership/*
+  native/      Capacitor bridges: haptics lookup, biometrics, RevenueCat billing
   screens/     Overview, Analytics, Goals, Profile
 scripts/       parse_kaspi_statement.py, make-icons.cjs
+tests/         e2e/*.spec.js (Playwright), fixtures/ (synthetic data and PDF generator)
 ```
 
 ## Advisor (`src/utils/advisor.js`)
 - `buildAdvice()` is rule-based. It averages cash flow over the last 60 days, or over the available data if there is less. It compares how many weeks the goal will take with the weeks left before the deadline. It ranks quantified tips: the top flexible category, food delivery, taxi vs metro, small purchases, transfer fees, the 50/30/20 savings rate, and "pay yourself first".
-- `getAIAdvice()` is the LLM hook. When an API key is saved in Профиль, the Goals screen shows a «Совет от ИИ» button. The button sends the goal, the monthly summary and the transactions from the last 60 days to Claude (`claude-opus-5-5`) through `@anthropic-ai/sdk` from the browser. Server-side refusal fallbacks are enabled. The OpenAI path is a TODO stub. The key lives only in localStorage and is never included in exports. For anything beyond personal use, move this call to a server.
+- `buildTelemetry()` (`src/utils/telemetry.js`) feeds «Главные цифры» on Планы: «Расход в месяц» (and per day), «Откладываете» (share of income saved), «Запас денег» (days the balance lasts at the current spending) and «Главная статья» (largest category's share), over the same 60-day window. All user-facing copy is plain Russian — no banking jargon or English terms.
+- `getAIAdvice()` is the LLM hook (Private). When an API key is saved in Профиль, the Goals screen shows «ИИ-разбор капитала». The button sends the goal, the monthly summary and the transactions from the last 60 days to Claude (`claude-opus-5-5`) through `@anthropic-ai/sdk` from the browser. Server-side refusal fallbacks are enabled. The OpenAI path is a TODO stub. The key lives only in localStorage and is never included in exports. For anything beyond personal use, move this call to a server.

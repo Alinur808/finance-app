@@ -1,3 +1,4 @@
+import { usePrivacy } from '../hooks/usePrivacy.js';
 import { formatMoney, formatPercent } from '../utils/format.js';
 
 const TAU = Math.PI * 2;
@@ -21,6 +22,7 @@ export default function DonutChart({ data, total, activeId, onActive, size = 208
   const r1 = size / 2 - 4;
   const r0 = r1 - 26;
   const active = data.find((d) => d.id === activeId);
+  const { money, hidden } = usePrivacy();
 
   let angle = 0;
   const slices = data.map((d) => {
@@ -34,7 +36,7 @@ export default function DonutChart({ data, total, activeId, onActive, size = 208
   return (
     <div className="relative mx-auto" style={{ width: size, height: size }}>
       <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} role="img" aria-label="Расходы по категориям">
-        {total === 0 && <circle cx={cx} cy={cx} r={(r0 + r1) / 2} fill="none" stroke="#f3f4f6" strokeWidth={r1 - r0} />}
+        {total === 0 && <circle cx={cx} cy={cx} r={(r0 + r1) / 2} fill="none" style={{ stroke: 'rgb(var(--gray-100))' }} strokeWidth={r1 - r0} />}
         {slices.map((s) => {
           const dim = active && active.id !== s.id;
           return (
@@ -42,7 +44,7 @@ export default function DonutChart({ data, total, activeId, onActive, size = 208
               key={s.id}
               d={segmentPath(cx, cx, active?.id === s.id ? r0 - 3 : r0, active?.id === s.id ? r1 + 3 : r1, s.a0, s.a1)}
               fill={s.color}
-              stroke="#fff"
+              style={{ stroke: 'rgb(var(--surface))' }}
               strokeWidth={2}
               strokeLinejoin="round"
               opacity={dim ? 0.35 : 1}
@@ -51,14 +53,14 @@ export default function DonutChart({ data, total, activeId, onActive, size = 208
               onPointerLeave={(e) => e.pointerType === 'mouse' && onActive(null)}
               onClick={() => onActive(activeId === s.id ? null : s.id)}
             >
-              <title>{`${s.label}: ${formatMoney(s.value)} (${formatPercent(s.value / total)})`}</title>
+              <title>{`${s.label}: ${hidden ? money(s.value) : formatMoney(s.value)} (${formatPercent(s.value / total)})`}</title>
             </path>
           );
         })}
       </svg>
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-        <p className="max-w-[120px] truncate text-[12px] font-medium text-ink-muted">{active ? active.label : 'Всего потрачено'}</p>
-        <p className="tabular text-[22px] font-extrabold tracking-tight">{formatMoney(active ? active.value : total, { compact: true })}</p>
+        <p className="max-w-[120px] truncate text-[12px] font-medium text-ink-muted">{active ? active.label : 'Все расходы'}</p>
+        <p className="tabular text-[22px] font-semibold tracking-tight">{money(active ? active.value : total, { compact: true })}</p>
         {active && <p className="tabular text-[12px] font-semibold text-ink-soft">{formatPercent(active.value / total, 1)}</p>}
       </div>
     </div>

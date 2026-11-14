@@ -1,6 +1,33 @@
 import { useMemo, useState } from 'react';
-import { ChevronRight, Download, Eye, FileUp, KeyRound, Loader2, PencilLine, RotateCcw, ShieldAlert, ShieldCheck, Sparkles, UserRound, Wallet } from 'lucide-react';
+import {
+  ChevronRight,
+  Crown,
+  Download,
+  Eye,
+  FileUp,
+  KeyRound,
+  Loader2,
+  Lock,
+  Moon,
+  PencilLine,
+  RotateCcw,
+  ScanFace,
+  ShieldAlert,
+  ShieldCheck,
+  Smartphone,
+  Sparkles,
+  Sun,
+  UserRound,
+  Vibrate,
+  Wallet,
+} from 'lucide-react';
 import { useFinance } from '../context/FinanceContext.jsx';
+import { useTheme, THEMES } from '../context/ThemeContext.jsx';
+import { useSecurity } from '../context/SecurityContext.jsx';
+import { useSubscription } from '../context/SubscriptionContext.jsx';
+import { usePrivacy } from '../hooks/usePrivacy.js';
+import PasscodeSetup from '../components/security/PasscodeSetup.jsx';
+import { hapticsEnabled, setHapticsEnabled } from '../utils/haptics.js';
 import { ACCOUNTS, DEFAULT_CARD_NAME } from '../data/accounts.js';
 import { useAccounts } from '../hooks/useAccounts.js';
 import { useBackupImport } from '../hooks/useBackupImport.js';
@@ -10,26 +37,17 @@ import { accountBalances } from '../utils/analytics.js';
 import { AI_PROVIDERS, detectProvider } from '../utils/advisor.js';
 import { downloadBackup } from '../utils/backup.js';
 import { amountToNumber, displayAmount, numberToRaw, sanitizeAmount } from '../utils/amountInput.js';
-import { formatMoney, plural } from '../utils/format.js';
-import { Card, ScreenHeader, SectionHeader } from '../components/ui.jsx';
+import { formatMoney, MONEY_MASK, plural } from '../utils/format.js';
+import { Card, ScreenHeader, SectionHeader, Segmented, Toggle } from '../components/ui.jsx';
 
 const TX_WORDS = ['операция', 'операции', 'операций'];
 const row = 'flex items-center gap-3 px-4 py-3.5';
-const fieldCls = 'h-10 rounded-xl bg-gray-100 px-3 text-right text-base font-semibold outline-none placeholder:font-normal placeholder:text-ink-muted focus:ring-2 focus:ring-brand-500';
+const fieldCls =
+  'h-10 rounded-xl bg-gray-100 px-3 text-right text-base font-semibold outline-none placeholder:font-normal placeholder:text-ink-muted focus:ring-2 focus:ring-brand-500';
 
-function Toggle({ on, onChange, label }) {
-  return (
-    <button
-      role="switch"
-      aria-checked={on}
-      aria-label={label}
-      onClick={() => onChange(!on)}
-      className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${on ? 'bg-brand-600' : 'bg-gray-200'}`}
-    >
-      <span className={`absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-5' : ''}`} />
-    </button>
-  );
-}
+const PrivateBadge = () => (
+  <span className="ml-1.5 rounded-full px-2 py-0.5 align-middle text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-700 ring-1 ring-amber-500/40">Private</span>
+);
 
 export default function Profile({ toast }) {
   const state = useFinance();
@@ -42,10 +60,17 @@ export default function Profile({ toast }) {
   const [aiOpen, setAiOpen] = useState(Boolean(settings.aiApiKey));
   const [showKey, setShowKey] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
-  const hidden = settings.hideBalance;
+  const [passcodeMode, setPasscodeMode] = useState(null); // null | 'create' | 'disable'
+  const [haptics, setHaptics] = useState(hapticsEnabled);
+  const { theme, setTheme } = useTheme();
+  const security = useSecurity();
+  const membership = useSubscription();
+  const privacy = usePrivacy();
+  const hidden = privacy.hidden;
 
   const onExport = async () => {
     try {
+      security.pauseAutoLock(); // меню «Поделиться» уводит страницу в фон
       const result = await downloadBackup(state);
       if (result !== 'cancelled') toast('Резервная копия сохранена');
     } catch {
@@ -65,7 +90,7 @@ export default function Profile({ toast }) {
       <ScreenHeader title="Профиль" />
       <div className="space-y-6 px-5">
         <Card className="flex items-center gap-4 p-4">
-          <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-brand-500 to-brand-800 text-xl font-bold text-white">
+          <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-gray-100 text-xl font-semibold text-ink">
             {settings.name.trim() ? settings.name.trim().slice(0, 1).toUpperCase() : <UserRound size={24} />}
           </div>
           <div className="min-w-0 flex-1">
@@ -86,8 +111,8 @@ export default function Profile({ toast }) {
         </Card>
 
         <section>
-          <SectionHeader title="Счета" action={hidden ? '••••' : formatMoney(Object.values(balances).reduce((a, b) => a + b, 0))} />
-          <Card className="divide-y divide-gray-100 overflow-hidden">
+          <SectionHeader title="Счета" action={privacy.money(Object.values(balances).reduce((a, b) => a + b, 0))} />
+          <Card className="divide-y divide-hairline overflow-hidden">
             {accounts.map((a) => (
               <div key={a.id}>
                 <button
@@ -102,7 +127,7 @@ export default function Profile({ toast }) {
                     <span className="block truncate font-semibold">{a.name}</span>
                     <span className="block text-[13px] text-ink-muted">{a.kind}</span>
                   </span>
-                  <span className="font-bold">{hidden ? '••••' : formatMoney(balances[a.id], { decimals: true })}</span>
+                  <span className="tabular min-w-0 truncate font-semibold">{hidden ? MONEY_MASK : formatMoney(balances[a.id], { decimals: true })}</span>
                   <PencilLine size={15} className="shrink-0 text-gray-300" aria-label="Исправить баланс" />
                 </button>
                 {editBalance?.accountId === a.id && (
@@ -117,9 +142,9 @@ export default function Profile({ toast }) {
                       inputMode="decimal"
                       value={displayAmount(editBalance.raw)}
                       onChange={(e) => setEditBalance({ accountId: a.id, raw: sanitizeAmount(e.target.value) })}
-                      className={`${fieldCls} w-32 bg-white`}
+                      className={`${fieldCls} w-32 bg-surface`}
                     />
-                    <button type="submit" className="pressable h-10 rounded-xl bg-ink px-3 text-sm font-semibold text-white">
+                    <button type="submit" className="pressable h-10 rounded-xl bg-ink px-3 text-sm font-semibold text-on-ink">
                       OK
                     </button>
                   </form>
@@ -145,7 +170,7 @@ export default function Profile({ toast }) {
           <SectionHeader title="Данные" />
           <Card className="space-y-3 p-4">
             <div className="grid gap-2">
-              <button onClick={onExport} className="pressable flex h-12 items-center justify-center gap-2 rounded-2xl bg-brand-600 text-[15px] font-semibold text-white">
+              <button onClick={onExport} className="pressable flex h-12 items-center justify-center gap-2 rounded-2xl bg-ink text-[15px] font-semibold text-on-ink">
                 <Download size={17} /> Экспорт данных в JSON
               </button>
               <button
@@ -168,8 +193,134 @@ export default function Profile({ toast }) {
         </section>
 
         <section>
+          <SectionHeader title="Membership" />
+          <Card className="divide-y divide-hairline overflow-hidden">
+            <button onClick={() => membership.openPaywall()} className={`${row} w-full text-left active:bg-gray-100`} data-testid="open-membership">
+              <span
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-[#1d1608]"
+                style={{ background: 'linear-gradient(135deg, #f3e3bd 0%, #d8b56e 55%, #b98f45 100%)' }}
+              >
+                <Crown size={17} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[15px] font-semibold">Private Membership</span>
+                <span className="block text-[13px] text-ink-muted">
+                  {membership.isPrivate ? 'Активен · все возможности открыты' : 'Стратег без лимитов, история выписок, код-пароль'}
+                </span>
+              </span>
+              <ChevronRight size={18} className="shrink-0 text-gray-300" />
+            </button>
+            {!membership.hasStore && (
+              <div className="px-4 py-3.5">
+                <p className="text-[15px] font-medium">Режим подписки</p>
+                <p className="mb-2.5 text-[12px] text-ink-muted">Preview: переключайте Free / Private, чтобы проверить оба сценария до подключения RevenueCat.</p>
+                <Segmented
+                  size="sm"
+                  value={membership.tier}
+                  onChange={membership.setPreviewTier}
+                  items={[
+                    ['standard', 'Free · Standard'],
+                    ['private', 'Private'],
+                  ]}
+                />
+              </div>
+            )}
+          </Card>
+        </section>
+
+        <section>
+          <SectionHeader title="Внешний вид" />
+          <div className="grid grid-cols-2 gap-3" role="radiogroup" aria-label="Тема">
+            {Object.values(THEMES).map((t) => {
+              const on = theme === t.id;
+              const dark = t.id === 'obsidian';
+              return (
+                <button
+                  key={t.id}
+                  role="radio"
+                  aria-checked={on}
+                  onClick={() => setTheme(t.id)}
+                  className={`pressable rounded-3xl bg-surface p-3 text-left shadow-card ${on ? 'ring-2 ring-brand-500' : ''}`}
+                  data-testid={`theme-${t.id}`}
+                >
+                  <span
+                    className="block h-16 overflow-hidden rounded-2xl p-2"
+                    style={{ background: dark ? '#050507' : '#f5f4f0', boxShadow: 'inset 0 0 0 1px rgba(127,127,127,0.2)' }}
+                  >
+                    <span className="block h-full rounded-xl" style={{ background: dark ? 'linear-gradient(150deg,#1c1f27,#08090c)' : 'linear-gradient(150deg,#f4efe4,#d6c7a8)' }}>
+                      <span className="block px-2 pt-2 text-[10px] font-semibold tabular-nums" style={{ color: dark ? '#f4f5f7' : '#211b10' }}>
+                        1 250 000 ₸
+                      </span>
+                    </span>
+                  </span>
+                  <span className="mt-2 flex items-center gap-1.5 px-1 text-[14px] font-semibold">
+                    {dark ? <Moon size={14} /> : <Sun size={14} />} {t.label}
+                  </span>
+                  <span className="block px-1 text-[12px] text-ink-muted">{t.hint}</span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        <section>
+          <SectionHeader title="Приватность и защита" />
+          <Card className="divide-y divide-hairline overflow-hidden">
+            <div className={row}>
+              <Eye size={20} className="shrink-0 text-ink-soft" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-[15px] font-medium">Stealth Mode</span>
+                <span className="block text-[12px] text-ink-muted">Суммы скрыты: {MONEY_MASK}. Графики остаются.</span>
+              </span>
+              <Toggle on={hidden} onChange={privacy.toggle} label="Stealth Mode" />
+            </div>
+            <div className={row}>
+              <Lock size={20} className="shrink-0 text-ink-soft" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-[15px] font-medium">
+                  Защита код-паролем
+                  {!membership.isPrivate && !security.enabled && <PrivateBadge />}
+                </span>
+                <span className="block text-[12px] text-ink-muted">При запуске и возврате в приложение</span>
+              </span>
+              <Toggle
+                on={security.enabled}
+                label="Защита код-паролем"
+                onChange={(on) => {
+                  if (on && !membership.require('passcode')) return;
+                  setPasscodeMode(on ? 'create' : 'disable');
+                }}
+              />
+            </div>
+            {security.enabled && security.canBiometric && (
+              <div className={row}>
+                <ScanFace size={20} className="shrink-0 text-ink-soft" />
+                <span className="flex-1 text-[15px] font-medium">Face ID / Touch ID</span>
+                <Toggle on={security.biometricsEnabled} onChange={security.setBiometrics} label="Face ID" />
+              </div>
+            )}
+            <div className={row}>
+              <Vibrate size={20} className="shrink-0 text-ink-soft" />
+              <span className="flex-1 text-[15px] font-medium">Тактильный отклик</span>
+              <Toggle
+                on={haptics}
+                label="Тактильный отклик"
+                onChange={(on) => {
+                  setHapticsEnabled(on);
+                  setHaptics(on);
+                }}
+              />
+            </div>
+          </Card>
+          <p className="mt-2 flex gap-2 px-1 text-[12px] leading-snug text-ink-muted">
+            <Smartphone size={14} className="mt-0.5 shrink-0" />
+            Код-пароль хранится на устройстве в виде хеша и не попадает в резервную копию.
+          </p>
+        </section>
+
+        <section>
           <SectionHeader title="Настройки" />
-          <Card className="divide-y divide-gray-100 overflow-hidden">
+          <Card className="divide-y divide-hairline overflow-hidden">
             <label htmlFor="budget" className={row}>
               <Wallet size={20} className="shrink-0 text-ink-soft" />
               <span className="flex-1 text-[15px] font-medium">Бюджет в месяц</span>
@@ -185,15 +336,11 @@ export default function Profile({ toast }) {
                 <span className="text-ink-muted">₸</span>
               </span>
             </label>
-            <div className={row}>
-              <Eye size={20} className="shrink-0 text-ink-soft" />
-              <span className="flex-1 text-[15px] font-medium">Скрывать суммы</span>
-              <Toggle on={hidden} onChange={(v) => updateSettings({ hideBalance: v })} label="Скрывать суммы" />
-            </div>
             <button onClick={() => setAiOpen((v) => !v)} className={`${row} w-full text-left active:bg-gray-50`} aria-expanded={aiOpen}>
               <Sparkles size={20} className="shrink-0 text-ink-soft" />
               <span className="flex-1 text-[15px] font-medium">
-                ИИ-советник <span className="ml-1 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-ink-muted">бета</span>
+                ИИ-разбор капитала{' '}
+                {membership.isPrivate ? <span className="ml-1 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-ink-muted">бета</span> : <PrivateBadge />}
               </span>
               <span className="text-[13px] text-ink-muted">{settings.aiApiKey ? 'включён' : 'выключен'}</span>
               <ChevronRight size={18} className={`shrink-0 text-gray-300 transition-transform ${aiOpen ? 'rotate-90' : ''}`} />
@@ -225,9 +372,8 @@ export default function Profile({ toast }) {
                   <p className="text-[12px] text-amber-700">{AI_PROVIDERS[settings.aiProvider]?.label ?? 'Этот провайдер'} пока не подключён — нужен ключ Anthropic.</p>
                 )}
                 <p className="flex gap-2 text-[12px] leading-snug text-ink-muted">
-                  <ShieldAlert size={15} className="mt-0.5 shrink-0" />
-                  С ключом на вкладке «Планы» появится «Совет от ИИ»: он отправит операции за 60 дней выбранному провайдеру. Ключ хранится только на этом устройстве и не
-                  попадает в экспорт.
+                  <ShieldAlert size={15} className="mt-0.5 shrink-0" />С ключом на вкладке «Планы» появится «Совет от ИИ»: он отправит операции за 60 дней выбранному провайдеру.
+                  Ключ хранится только на этом устройстве и не попадает в экспорт.
                 </p>
               </div>
             )}
@@ -235,13 +381,14 @@ export default function Profile({ toast }) {
         </section>
 
         {confirmReset ? (
-          <div className="animate-rise-in rounded-3xl bg-white p-4 shadow-card ring-1 ring-red-100">
+          <div className="animate-rise-in rounded-3xl bg-surface p-4 shadow-card ring-1 ring-red-100">
             <p className="text-[15px] font-semibold">Удалить все данные на этом устройстве?</p>
             <p className="mt-1 text-sm text-ink-muted">Операции, цели и настройки пропадут, приложение откроется как в первый раз. Сначала сохраните резервную копию.</p>
             <div className="mt-3 flex gap-2">
               <button
                 onClick={() => {
                   resetAll();
+                  security.disablePasscode();
                   setConfirmReset(false);
                 }}
                 className="pressable h-11 flex-1 rounded-xl bg-red-600 text-sm font-semibold text-white"
@@ -259,6 +406,16 @@ export default function Profile({ toast }) {
           </button>
         )}
       </div>
+      {passcodeMode && (
+        <PasscodeSetup
+          mode={passcodeMode}
+          onCancel={() => setPasscodeMode(null)}
+          onDone={(result) => {
+            setPasscodeMode(null);
+            toast(result === 'enabled' ? 'Код-пароль включён' : 'Код-пароль отключён');
+          }}
+        />
+      )}
     </div>
   );
 }

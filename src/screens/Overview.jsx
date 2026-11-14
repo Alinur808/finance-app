@@ -3,16 +3,19 @@ import { Receipt } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext.jsx';
 import { ACCOUNTS } from '../data/accounts.js';
 import { useAccounts } from '../hooks/useAccounts.js';
-import { accountBalances, filterTransactions, spendingByCategory, totals } from '../utils/analytics.js';
+import { accountBalances, cashflowSeries, filterTransactions, spendingByCategory, totals } from '../utils/analytics.js';
+import { getPeriodRange } from '../utils/dates.js';
+import { usePrivacy } from '../hooks/usePrivacy.js';
+import CashflowChart from '../components/CashflowChart.jsx';
 import { buildPlanForecast } from '../utils/plan.js';
-import { formatMoney, plural } from '../utils/format.js';
+import { plural } from '../utils/format.js';
 import BalanceCard from '../components/BalanceCard.jsx';
 import Onboarding from '../components/Onboarding.jsx';
 import DiarySummary from '../components/diary/DiarySummary.jsx';
 import FilterChips from '../components/FilterChips.jsx';
 import TopSpending from '../components/TopSpending.jsx';
 import TransactionList from '../components/TransactionList.jsx';
-import { EmptyState, SectionHeader } from '../components/ui.jsx';
+import { Card, EmptyState, SectionHeader } from '../components/ui.jsx';
 
 const TX_WORDS = ['операция', 'операции', 'операций'];
 
@@ -20,6 +23,7 @@ export default function Overview({ now, onSelectTx, onNavigate, toast }) {
   const { transactions, filters, setFilters, settings, plan } = useFinance();
   const { getAccount } = useAccounts();
   const [showFx, setShowFx] = useState(false);
+  const { money, hidden } = usePrivacy();
 
   const filtered = useMemo(() => filterTransactions(transactions, filters, now), [transactions, filters, now]);
   const { income, expense } = useMemo(() => totals(filtered), [filtered]);
@@ -29,10 +33,16 @@ export default function Overview({ now, onSelectTx, onNavigate, toast }) {
 
   // Курсовые разницы (копейки) скрыты по умолчанию, чтобы не засорять ленту.
   const fxCount = useMemo(() => filtered.filter((t) => t.categoryId === 'fx').length, [filtered]);
-  const visible = useMemo(
-    () => (!showFx && filters.categoryId !== 'fx' ? filtered.filter((t) => t.categoryId !== 'fx') : filtered),
-    [filtered, showFx, filters.categoryId],
-  );
+  const visible = useMemo(() => (!showFx && filters.categoryId !== 'fx' ? filtered.filter((t) => t.categoryId !== 'fx') : filtered), [filtered, showFx, filters.categoryId]);
+
+  // Денежный поток за выбранный период (с первой операции, если данных меньше)
+  const flow = useMemo(() => {
+    if (filters.period === 'today' || !filtered.length) return null;
+    const range = getPeriodRange(filters.period, now);
+    const first = new Date(filtered[filtered.length - 1].date);
+    const start = first > range.start ? first : range.start;
+    return cashflowSeries(filtered, start, range.end > now ? now : range.end);
+  }, [filtered, filters.period, now]);
 
   // Строка дневника — только если план заполнен
   const hasPlan = plan.items.length > 0 || plan.incomes.length > 0;
@@ -46,28 +56,32 @@ export default function Overview({ now, onSelectTx, onNavigate, toast }) {
 
   return (
     <div>
-      <BalanceCard
-        balance={balances[card.id]}
-        income={income}
-        expense={expense}
-        accountName={card.name}
-        accountKind={card.kind}
-        onOpenProfile={() => onNavigate('profile')}
-      />
+      <BalanceCard balance={balances[card.id]} income={income} expense={expense} accountName={card.name} accountKind={card.kind} onOpenProfile={() => onNavigate('profile')} />
 
       <div className="space-y-5 px-5 pt-5">
         {filters.accountId === 'all' && Math.abs(total - balances[card.id]) >= 0.01 && (
           <p className="-mt-2 px-1 text-[13px] text-ink-muted">
-            Всего на счетах: <span className="font-semibold text-ink-soft">{settings.hideBalance ? '••••' : formatMoney(total)}</span>
+            Всего на счетах: <span className="tabular font-semibold text-ink-soft">{money(total)}</span>
           </p>
         )}
 
-        {forecast && !forecast.isOver && <DiarySummary forecast={forecast} hidden={settings.hideBalance} onOpen={() => onNavigate('goals', 'diary')} />}
+        {forecast && !forecast.isOver && <DiarySummary forecast={forecast} hidden={hidden} onOpen={() => onNavigate('goals', 'diary')} />}
 
         <FilterChips />
 
+        {flow && flow.length > 1 && (
+          <Card className="p-4">
+            <CashflowChart buckets={flow} now={now} height={112} caption="Итог за период" testId="overview-cashflow" />
+          </Card>
+        )}
+
         {!filters.categoryId && breakdown.length > 0 && (
-          <TopSpending breakdown={breakdown} total={breakdown.reduce((s, c) => s + c.amount, 0)} onOpen={() => onNavigate('analytics')} onPick={(id) => setFilters({ categoryId: id })} />
+          <TopSpending
+            breakdown={breakdown}
+            total={breakdown.reduce((s, c) => s + c.amount, 0)}
+            onOpen={() => onNavigate('analytics')}
+            onPick={(id) => setFilters({ categoryId: id })}
+          />
         )}
 
         <section>

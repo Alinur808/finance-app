@@ -2,13 +2,14 @@ import { useMemo, useState } from 'react';
 import { ArrowDownRight, ArrowUpRight, ChevronRight, PieChart } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext.jsx';
 import { OTHER_COLOR } from '../data/categories.js';
-import { filterTransactions, inRange, spendingByCategory, spendingSeries, totals } from '../utils/analytics.js';
+import { cashflowSeries, filterTransactions, inRange, spendingByCategory, totals } from '../utils/analytics.js';
 import { formatShortDate, getPeriodRange, PERIODS, startOfDay } from '../utils/dates.js';
-import { formatMoney, formatPercent } from '../utils/format.js';
+import { formatPercent } from '../utils/format.js';
+import { usePrivacy } from '../hooks/usePrivacy.js';
+import CashflowChart from '../components/CashflowChart.jsx';
 import CategoryIcon from '../components/CategoryIcon.jsx';
 import DonutChart from '../components/DonutChart.jsx';
 import FilterChips from '../components/FilterChips.jsx';
-import SpendingBars from '../components/SpendingBars.jsx';
 import { Card, EmptyState, ScreenHeader } from '../components/ui.jsx';
 
 const MAX_SLICES = 6;
@@ -18,6 +19,7 @@ export default function Analytics({ now, onPickCategory }) {
   const { transactions, filters, settings } = useFinance();
   const [activeId, setActiveId] = useState(null);
   const [variableOnly, setVariableOnly] = useState(true);
+  const { money } = usePrivacy();
   const scoped = { ...filters, categoryId: null }; // analytics always shows every category
 
   const filtered = useMemo(() => filterTransactions(transactions, scoped, now), [transactions, filters.period, filters.accountId, now]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -41,12 +43,13 @@ export default function Analytics({ now, onPickCategory }) {
   // first real transaction bounds "All time"/"3 months" so the chart starts at data
   const firstTx = filtered.length ? new Date(filtered[filtered.length - 1].date) : range.start;
   const seriesStart = filters.period === 'all' || filters.period === '30days' ? (firstTx > range.start ? firstTx : range.start) : range.start;
+  const seriesEnd = range.end > now ? now : range.end;
   const buckets = useMemo(
-    () => spendingSeries(variableOnly ? filtered.filter((x) => !FIXED_COSTS.has(x.categoryId)) : filtered, seriesStart, range.end),
-    [filtered, variableOnly, seriesStart.getTime(), range.end.getTime()], // eslint-disable-line react-hooks/exhaustive-deps
+    () => cashflowSeries(filtered, seriesStart, seriesEnd, variableOnly ? { exclude: FIXED_COSTS } : undefined),
+    [filtered, variableOnly, seriesStart.getTime(), seriesEnd.getTime()], // eslint-disable-line react-hooks/exhaustive-deps
   );
-  const peak = buckets.reduce((m, b) => (b.amount > (m?.amount ?? 0) ? b : m), null);
-  const seriesTotal = buckets.reduce((sum, b) => sum + b.amount, 0);
+  const peak = buckets.reduce((m, b) => (b.expense > (m?.expense ?? 0) ? b : m), null);
+  const seriesTotal = buckets.reduce((sum, b) => sum + b.expense, 0);
   const elapsedDays = Math.floor((startOfDay(Math.min(range.end, now)) - startOfDay(seriesStart)) / 86400000) + 1;
   const avgPerDay = seriesTotal / Math.max(1, elapsedDays);
 
@@ -68,8 +71,8 @@ export default function Analytics({ now, onPickCategory }) {
 
         <div className="grid grid-cols-2 gap-3">
           <Card className="p-4">
-            <p className="text-[13px] font-medium text-ink-muted">Потрачено</p>
-            <p className="tabular mt-1 text-[22px] font-extrabold tracking-tight">{formatMoney(t.expense, { compact: t.expense >= 1e6 })}</p>
+            <p className="text-[13px] font-medium text-ink-muted">Расходы</p>
+            <p className="tabular mt-1 truncate text-[22px] font-semibold tracking-tight">{money(t.expense, { compact: t.expense >= 1e6 })}</p>
             {change != null ? (
               <p className={`mt-1 flex items-center gap-0.5 text-[12px] font-semibold ${change > 0 ? 'text-red-600' : 'text-brand-600'}`}>
                 {change > 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
@@ -81,12 +84,10 @@ export default function Analytics({ now, onPickCategory }) {
           </Card>
           <Card className="p-4">
             <p className="text-[13px] font-medium text-ink-muted">Осталось</p>
-            <p className={`tabular mt-1 text-[22px] font-extrabold tracking-tight ${t.net >= 0 ? 'text-brand-600' : 'text-red-600'}`}>
-              {formatMoney(t.net, { sign: true, compact: Math.abs(t.net) >= 1e6 })}
+            <p className={`tabular mt-1 truncate text-[22px] font-semibold tracking-tight ${t.net >= 0 ? 'text-brand-600' : 'text-red-600'}`}>
+              {money(t.net, { sign: true, compact: Math.abs(t.net) >= 1e6 })}
             </p>
-            <p className="mt-1 text-[12px] text-ink-muted">
-              {t.income > 0 ? `${formatPercent(Math.max(0, t.net / t.income))} от доходов` : 'Доходов пока нет'}
-            </p>
+            <p className="mt-1 text-[12px] text-ink-muted">{t.income > 0 ? `Откладываете ${formatPercent(Math.max(0, t.net / t.income))} дохода` : 'Доходов пока нет'}</p>
           </Card>
         </div>
 
@@ -95,7 +96,7 @@ export default function Analytics({ now, onPickCategory }) {
             <div className="flex items-baseline justify-between">
               <p className="text-sm font-semibold">Бюджет на месяц</p>
               <p className="tabular text-sm text-ink-muted">
-                <span className="font-bold text-ink">{formatMoney(t.expense)}</span> / {formatMoney(settings.monthlyBudget)}
+                <span className="font-bold text-ink">{money(t.expense)}</span> / {money(settings.monthlyBudget)}
               </p>
             </div>
             <div className="mt-2.5 h-2.5 overflow-hidden rounded-full bg-gray-100">
@@ -106,8 +107,8 @@ export default function Analytics({ now, onPickCategory }) {
             </div>
             <p className="mt-2 text-[12px] text-ink-muted">
               {budgetUsed > 1
-                ? `Бюджет превышен на ${formatMoney(t.expense - settings.monthlyBudget)}`
-                : `Осталось ${formatMoney(settings.monthlyBudget - t.expense)} · использовано ${formatPercent(budgetUsed)}`}
+                ? `Бюджет превышен на ${money(t.expense - settings.monthlyBudget)}`
+                : `Осталось ${money(settings.monthlyBudget - t.expense)} · использовано ${formatPercent(budgetUsed)}`}
             </p>
           </Card>
         )}
@@ -138,11 +139,14 @@ export default function Analytics({ now, onPickCategory }) {
                         <button className="min-w-0 flex-1 text-left" onClick={() => onPickCategory(c.id)}>
                           <div className="flex items-baseline justify-between gap-2">
                             <p className="text-sm font-semibold leading-tight">{c.category.name}</p>
-                            <p className="tabular shrink-0 text-sm font-bold">{formatMoney(c.amount)}</p>
+                            <p className="tabular shrink-0 text-sm font-semibold">{money(c.amount)}</p>
                           </div>
                           <div className="mt-1.5 flex items-center gap-2">
                             <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-100">
-                              <div className="h-full rounded-full" style={{ width: `${(c.amount / breakdown[0].amount) * 100}%`, backgroundColor: folded ? OTHER_COLOR : c.category.color }} />
+                              <div
+                                className="h-full rounded-full"
+                                style={{ width: `${(c.amount / breakdown[0].amount) * 100}%`, backgroundColor: folded ? OTHER_COLOR : c.category.color }}
+                              />
                             </div>
                             <span className="tabular w-24 text-right text-[12px] text-ink-muted">
                               {formatPercent(c.share)} · {c.count} опер.
@@ -157,23 +161,23 @@ export default function Analytics({ now, onPickCategory }) {
               </ol>
             </Card>
 
-            {filters.period !== 'today' && (
+            {filters.period !== 'today' && buckets.length > 1 && (
               <Card className="p-5">
                 <div className="flex items-start justify-between gap-3">
-                  <h2 className="text-[15px] font-bold">Расходы по {buckets[0]?.weekly ? 'неделям' : 'дням'}</h2>
+                  <h2 className="text-[15px] font-semibold">Доходы и расходы по {buckets[0]?.weekly ? 'неделям' : 'дням'}</h2>
                   <button
                     onClick={() => setVariableOnly((v) => !v)}
                     aria-pressed={variableOnly}
-                    className={`h-7 shrink-0 rounded-full px-3 text-[12px] font-semibold transition ${variableOnly ? 'bg-ink text-white' : 'bg-gray-100 text-ink-soft'}`}
+                    className={`h-7 shrink-0 rounded-full px-3 text-[12px] font-semibold transition ${variableOnly ? 'bg-ink text-on-ink' : 'bg-gray-100 text-ink-soft'}`}
                   >
                     {variableOnly ? 'Без переводов' : 'Все расходы'}
                   </button>
                 </div>
-                <p className="mb-6 text-[12px] text-ink-muted">
-                  ~{formatMoney(avgPerDay, { decimals: false })} в день
-                  {peak && ` · пик: ${buckets[0].weekly ? 'неделя с ' : ''}${formatShortDate(peak.start)}`}
+                <p className="mb-4 text-[12px] text-ink-muted">
+                  В среднем {money(avgPerDay, { decimals: false })} в день
+                  {peak?.expense > 0 && ` · пик: ${buckets[0].weekly ? 'неделя с ' : ''}${formatShortDate(peak.start)}`} · ведите пальцем по графику
                 </p>
-                <SpendingBars buckets={buckets} now={now} />
+                <CashflowChart buckets={buckets} now={now} caption={periodLabel} />
               </Card>
             )}
           </>

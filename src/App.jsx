@@ -9,17 +9,25 @@ import Overview from './screens/Overview.jsx';
 import Analytics from './screens/Analytics.jsx';
 import Goals from './screens/Goals.jsx';
 import Profile from './screens/Profile.jsx';
+import LockScreen from './components/security/LockScreen.jsx';
+import { useSecurity } from './context/SecurityContext.jsx';
+import { usePrivacy } from './hooks/usePrivacy.js';
 import { formatMoney } from './utils/format.js';
+import { haptic } from './utils/haptics.js';
 
 export default function App() {
   const { transactions, addTransaction, updateTransaction, deleteTransaction, setFilters, settings } = useFinance();
   const now = useNow();
+  const { locked } = useSecurity();
+  const privacy = usePrivacy();
   const [tab, setTab] = useState('overview');
   const [goalsSection, setGoalsSection] = useState('goals');
   const [adding, setAdding] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
   const [message, setMessage] = useState(null);
-  const toast = useCallback((m) => setMessage(m), []);
+  // в Stealth Mode суммы не появляются даже во всплывающих сообщениях
+  const maskText = privacy.text;
+  const toast = useCallback((m) => setMessage(maskText(m)), [maskText]);
   const clearToast = useCallback(() => setMessage(null), []);
   const onSelectTx = useCallback((tx) => setSelectedId(tx.id), []);
   const selected = selectedId ? transactions.find((t) => t.id === selectedId) : null;
@@ -55,37 +63,47 @@ export default function App() {
   };
 
   return (
-    <div className="relative mx-auto min-h-dvh max-w-md bg-canvas" style={{ paddingBottom: firstRun ? 0 : 'calc(96px + env(safe-area-inset-bottom))' }}>
-      <main key={tab} className="animate-fade-in">
-        {screens[firstRun ? 'overview' : tab]}
-      </main>
+    <div
+      className="relative mx-auto min-h-dvh max-w-md bg-canvas"
+      style={{
+        paddingBottom: firstRun ? 0 : 'calc(96px + env(safe-area-inset-bottom))',
+      }}
+    >
+      {/* заблокировано — содержимое остаётся в памяти, но скрыто и недоступно */}
+      <div aria-hidden={locked || undefined} style={locked ? { visibility: 'hidden' } : undefined}>
+        <main key={tab} className="animate-fade-in">
+          {screens[firstRun ? 'overview' : tab]}
+        </main>
 
-      {!firstRun && <BottomNav active={tab} onChange={navigate} onAdd={() => setAdding(true)} />}
+        {!firstRun && <BottomNav active={tab} onChange={navigate} onAdd={() => setAdding(true)} />}
 
-      <AddTransactionSheet
-        open={adding}
-        onClose={() => setAdding(false)}
-        onSave={(tx) => {
-          addTransaction(tx);
-          setAdding(false);
-          toast(`${tx.type === 'income' ? 'Доход' : 'Расход'} ${formatMoney(tx.amount)} добавлен`);
-        }}
-      />
-      <TransactionDetailSheet
-        tx={selected}
-        onClose={() => setSelectedId(null)}
-        onChangeCategory={(id, categoryId) => {
-          updateTransaction(id, { categoryId });
-          toast('Категория изменена');
-        }}
-        onDelete={(id) => {
-          deleteTransaction(id);
-          setSelectedId(null);
-          toast('Операция удалена');
-        }}
-      />
-      <IOSInstallHint />
-      <Toast message={message} onDone={clearToast} />
+        <AddTransactionSheet
+          open={adding}
+          onClose={() => setAdding(false)}
+          onSave={(tx) => {
+            addTransaction(tx);
+            haptic('success');
+            setAdding(false);
+            toast(`${tx.type === 'income' ? 'Доход' : 'Расход'} ${formatMoney(tx.amount)} добавлен`);
+          }}
+        />
+        <TransactionDetailSheet
+          tx={selected}
+          onClose={() => setSelectedId(null)}
+          onChangeCategory={(id, categoryId) => {
+            updateTransaction(id, { categoryId });
+            toast('Категория изменена');
+          }}
+          onDelete={(id) => {
+            deleteTransaction(id);
+            setSelectedId(null);
+            toast('Операция удалена');
+          }}
+        />
+        <IOSInstallHint />
+        <Toast message={message} onDone={clearToast} />
+      </div>
+      {locked && <LockScreen />}
     </div>
   );
 }

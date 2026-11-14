@@ -26,7 +26,8 @@ export default function ImportConfirm({ pending, onConfirm, onCancel }) {
           {foreign > 0 && (
             <p>
               {plural(foreign, TX_WORDS)} в AED/USD пересчитаны в тенге
-              {rates.length ? ` по курсу из выписки (${[...new Set(rates)].map((r) => String(r).replace('.', ',')).join(' и ')} ₸ за 1 AED)` : ''} — суммы могут немного отличаться от банковских.
+              {rates.length ? ` по курсу из выписки (${[...new Set(rates)].map((r) => String(r).replace('.', ',')).join(' и ')} ₸ за 1 AED)` : ''} — суммы могут немного отличаться
+              от банковских.
             </p>
           )}
           {pending.warnings?.map((w) => (
@@ -43,10 +44,10 @@ export default function ImportConfirm({ pending, onConfirm, onCancel }) {
         </p>
       )}
       <div className="mt-2.5 flex gap-2">
-        <button onClick={onConfirm} className="h-10 flex-1 rounded-xl bg-amber-500 text-sm font-semibold text-white active:bg-amber-600">
+        <button onClick={onConfirm} className="h-10 flex-1 rounded-xl bg-ink text-sm font-semibold text-on-ink active:opacity-80">
           {statement ? 'Загрузить выписку' : 'Заменить данные'}
         </button>
-        <button onClick={onCancel} className="h-10 flex-1 rounded-xl bg-white text-sm font-semibold text-ink-soft">
+        <button onClick={onCancel} className="h-10 flex-1 rounded-xl bg-surface text-sm font-semibold text-ink-soft">
           Отмена
         </button>
       </div>

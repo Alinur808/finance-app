@@ -2,15 +2,14 @@ import { useState } from 'react';
 import { SlidersHorizontal } from 'lucide-react';
 import { addDays, formatFullDate } from '../../utils/dates.js';
 import { describeWeeks, weeksToSave } from '../../utils/advisor.js';
-import { formatMoney } from '../../utils/format.js';
+import { usePrivacy } from '../../hooks/usePrivacy.js';
 import CategoryIcon from '../CategoryIcon.jsx';
 import { Card } from '../ui.jsx';
 
-/** Расчётные суммы показываем без тиынов. */
-const money = (v, opts = {}) => formatMoney(v, { decimals: false, ...opts });
-
 /** Drag sliders to cut flexible categories and watch the goal date move. */
 export default function WhatIfSimulator({ advice, goal }) {
+  const privacy = usePrivacy();
+  const money = (v, opts = {}) => privacy.money(v, { decimals: false, ...opts }); // без тиынов
   const cats = advice.discretionary.slice(0, 3);
   const [cuts, setCuts] = useState(() => Object.fromEntries(cats.map((c, i) => [c.id, i === 0 ? 50 : 0])));
 
@@ -59,7 +58,7 @@ export default function WhatIfSimulator({ advice, goal }) {
       <div className="mt-4 rounded-2xl bg-gray-50 p-3.5">
         <div className="flex items-baseline justify-between">
           <span className="text-sm text-ink-soft">Дополнительно</span>
-          <span className="tabular font-bold text-brand-600">+{money(extra)}/мес</span>
+          <span className="tabular font-bold text-brand-600">{privacy.hidden ? money(extra) : `+${money(extra)}`}/мес</span>
         </div>
         <div className="mt-1 flex items-baseline justify-between">
           <span className="text-sm text-ink-soft">Цель будет достигнута</span>

@@ -24,13 +24,8 @@ export default function IOSInstallHint() {
   };
 
   return (
-    <div
-      className="fixed inset-x-0 z-[45] mx-auto max-w-md px-4"
-      style={{ top: 'calc(12px + env(safe-area-inset-top, 0px))' }}
-      role="dialog"
-      aria-labelledby="ios-hint-title"
-    >
-      <div className="animate-rise-in rounded-3xl bg-ink p-4 text-white shadow-[0_12px_32px_rgba(17,24,39,0.35)]">
+    <div className="fixed inset-x-0 z-[45] mx-auto max-w-md px-4" style={{ top: 'calc(12px + env(safe-area-inset-top, 0px))' }} role="dialog" aria-labelledby="ios-hint-title">
+      <div className="animate-rise-in rounded-3xl bg-[#15171d] p-4 text-white shadow-[0_12px_32px_rgba(0,0,0,0.45)] ring-1 ring-white/10">
         <div className="flex items-start gap-3">
           <img src={`${import.meta.env.BASE_URL}apple-touch-icon.png`} alt="" className="h-11 w-11 shrink-0 rounded-xl" />
           <div className="min-w-0 flex-1">

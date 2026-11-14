@@ -10,10 +10,7 @@ export const inRange = (tx, start, end) => {
 export function filterTransactions(transactions, filters, now = new Date()) {
   const { start, end } = getPeriodRange(filters.period, now);
   return transactions.filter(
-    (tx) =>
-      inRange(tx, start, end) &&
-      (filters.accountId === 'all' || tx.accountId === filters.accountId) &&
-      (!filters.categoryId || tx.categoryId === filters.categoryId),
+    (tx) => inRange(tx, start, end) && (filters.accountId === 'all' || tx.accountId === filters.accountId) && (!filters.categoryId || tx.categoryId === filters.categoryId),
   );
 }
 
@@ -59,9 +56,7 @@ export function spendingByCategory(transactions) {
     row.count += 1;
     byId.set(tx.categoryId, row);
   }
-  return [...byId.values()]
-    .map((r) => ({ ...r, share: total ? r.amount / total : 0 }))
-    .sort((a, b) => b.amount - a.amount);
+  return [...byId.values()].map((r) => ({ ...r, share: total ? r.amount / total : 0 })).sort((a, b) => b.amount - a.amount);
 }
 
 /** Groups (already sorted, newest-first) transactions into date sections. */
@@ -84,23 +79,31 @@ export function groupByDay(transactions) {
 }
 
 /**
- * Spending series for the bar chart. Daily buckets for ranges up to ~5 weeks,
- * weekly buckets beyond that so bars stay readable on a phone.
+ * Денежный поток по дням (или неделям, если диапазон длиннее 5 недель):
+ * [{ start, end, income, expense, net, cumulative, weekly }].
+ * Переводы между своими счетами не считаются ни доходом, ни расходом.
+ * `exclude` — категории, которые не учитываются в расходах (например, переводы людям).
  */
-export function spendingSeries(transactions, start, end) {
+export function cashflowSeries(transactions, start, end, { exclude } = {}) {
   const s = startOfDay(start);
   const days = Math.round((startOfDay(end) - s) / 86400000) + 1;
   const weekly = days > 35;
   const step = weekly ? 7 : 1;
   const buckets = [];
-  for (let d = s; d <= end; d = addDays(d, step)) {
-    buckets.push({ start: d, end: addDays(d, step), amount: 0, weekly });
-  }
+  for (let d = s; d <= end; d = addDays(d, step)) buckets.push({ start: d, end: addDays(d, step), income: 0, expense: 0, net: 0, cumulative: 0, weekly });
   for (const tx of transactions) {
-    if (tx.type !== 'expense' || isInternal(tx)) continue;
-    const t = new Date(tx.date);
-    const i = Math.floor((startOfDay(t) - s) / (86400000 * step));
-    if (buckets[i]) buckets[i].amount += tx.amount;
+    if (isInternal(tx)) continue;
+    const i = Math.floor((startOfDay(tx.date) - s) / (86400000 * step));
+    const b = buckets[i];
+    if (!b) continue;
+    if (tx.type === 'income') b.income += tx.amount;
+    else if (!exclude?.has(tx.categoryId)) b.expense += tx.amount;
+  }
+  let running = 0;
+  for (const b of buckets) {
+    b.net = b.income - b.expense;
+    running += b.net;
+    b.cumulative = running;
   }
   return buckets;
 }
