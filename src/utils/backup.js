@@ -46,17 +46,16 @@ const isTx = (t) =>
   typeof t.categoryId === 'string' &&
   !Number.isNaN(new Date(t.date).getTime());
 
-const isPdf = async (file) =>
-  file.type === 'application/pdf' || /\.pdf$/i.test(file.name) || (await file.slice(0, 5).text()) === '%PDF-';
+const isPdf = async (file) => file.type === 'application/pdf' || /\.pdf$/i.test(file.name) || (await file.slice(0, 5).text()) === '%PDF-';
 
 /**
  * Любой поддерживаемый файл: JSON-копия → { kind: 'backup', … },
- * PDF-выписка Freedom Bank → { kind: 'statement', … } (разбор в браузере).
+ * PDF-выписка любого банка → { kind: 'statement', … } (разбор в браузере, см. statementParser.js).
  */
 export async function readImportFile(file) {
   if (await isPdf(file)) {
-    const { readFreedomPdf } = await import('./pdfImport.js');
-    return { kind: 'statement', ...(await readFreedomPdf(file)) };
+    const { readStatementPdf } = await import('./pdfImport.js');
+    return { kind: 'statement', ...(await readStatementPdf(file)) };
   }
   return { kind: 'backup', ...(await readBackup(file)) };
 }
@@ -67,7 +66,7 @@ export async function readBackup(file) {
   try {
     data = JSON.parse(await file.text());
   } catch {
-    throw new Error('Файл не похож ни на JSON-копию, ни на PDF-выписку. Выберите файл, сохранённый через «Экспорт данных», или выписку Freedom Bank.');
+    throw new Error('Файл не похож ни на JSON-копию, ни на PDF-выписку. Выберите файл из «Экспорт данных» или PDF-выписку банка (Kaspi, Freedom, Halyk и др.).');
   }
   if (!Array.isArray(data?.transactions)) throw new Error('В файле нет списка операций.');
   const bad = data.transactions.filter((t) => !isTx(t)).length;

@@ -15,15 +15,29 @@ export default function ImportConfirm({ pending, onConfirm, onCancel }) {
     <div className="rounded-2xl bg-amber-50 p-3 ring-1 ring-amber-100">
       {statement ? (
         <div className="space-y-1.5 text-[13px] leading-snug text-amber-900">
-          <p className="flex items-center gap-1.5 font-semibold">
+          <p className="flex items-center gap-1.5 font-semibold" data-testid="import-card">
             <FileText size={15} /> {pending.cardName}
           </p>
           <p>
-            Выписка за {day(pending.period.from)} – {day(pending.period.to)}: {plural(pending.transactions.length, TX_WORDS)}. Баланс карты станет{' '}
-            <b>{formatMoney(pending.closingBalance)}</b>.
+            Выписка за {day(pending.period.from)} – {day(pending.period.to)}: {plural(pending.transactions.length, TX_WORDS)}.
+            {pending.closingBalance != null && (
+              <>
+                {' '}
+                Баланс карты станет <b>{formatMoney(pending.closingBalance)}</b>.
+              </>
+            )}
           </p>
           <p>Операции по карте за этот период будут заменены выпиской. Наличные, другие месяцы, цели и план останутся.</p>
-          {foreign > 0 && (
+          {pending.conversions?.length > 0 && (
+            <p data-testid="import-rates">
+              Суммы в валюте пересчитаны в тенге по ориентировочному курсу: {pending.conversions.map((c) => `1 ${c.currency} = ${String(c.rate).replace('.', ',')} ₸`).join(', ')}.
+              Исходные суммы сохранены в операциях.
+            </p>
+          )}
+          {foreign > 0 && !pending.conversions?.length && pending.bank !== 'freedom' && (
+            <p>{plural(foreign, TX_WORDS)} в валюте — суммы в тенге взяты из выписки, как их списал банк.</p>
+          )}
+          {foreign > 0 && pending.bank === 'freedom' && (
             <p>
               {plural(foreign, TX_WORDS)} в AED/USD пересчитаны в тенге
               {rates.length ? ` по курсу из выписки (${[...new Set(rates)].map((r) => String(r).replace('.', ',')).join(' и ')} ₸ за 1 AED)` : ''} — суммы могут немного отличаться

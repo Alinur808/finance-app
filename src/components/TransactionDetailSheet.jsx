@@ -79,7 +79,7 @@ export default function TransactionDetailSheet({ tx, onClose, onDelete, onChange
           </div>
         ))}
       </dl>
-      {tx.note && tx.source === 'freedom-pdf' && (
+      {tx.note && /-pdf$/.test(tx.source ?? '') && (
         <p className="mt-3 rounded-2xl bg-gray-50 px-4 py-3 text-[13px] leading-snug text-ink-soft">
           {hidden ? maskMoneyInText(tx.note).replace(/[\d.,]+\s(AED|USD|EUR|RUB)/g, '•••• $1') : tx.note}
         </p>

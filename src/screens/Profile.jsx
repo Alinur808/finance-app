@@ -179,7 +179,7 @@ export default function Profile({ toast }) {
                 className="pressable flex h-12 items-center justify-center gap-2 rounded-2xl bg-gray-100 text-[15px] font-semibold text-ink disabled:opacity-70"
               >
                 {backupImport.busy ? <Loader2 size={17} className="animate-spin" /> : <FileUp size={17} />}
-                {backupImport.busy === 'parsing-pdf' ? 'Читаю выписку…' : 'Импорт: JSON или PDF Freedom'}
+                {backupImport.busy === 'parsing-pdf' ? 'Читаю выписку…' : 'Импорт: PDF-выписка или JSON'}
               </button>
             </div>
             <input id="import-file" {...backupImport.inputProps} />
@@ -187,7 +187,8 @@ export default function Profile({ toast }) {
             {backupImport.pending && <ImportConfirm pending={backupImport.pending} onConfirm={backupImport.confirm} onCancel={backupImport.cancel} />}
             <p className="flex gap-2 text-[12px] leading-snug text-ink-muted">
               <ShieldCheck size={15} className="mt-0.5 shrink-0 text-brand-600" />
-              Данные хранятся только в этом браузере, а PDF читается прямо на устройстве. Сохраняйте копию — она пригодится при смене телефона.
+              Подходят PDF-выписки любого банка (Kaspi, Freedom, Halyk и др.) и JSON-копии. Всё читается прямо на устройстве и хранится только здесь. Сохраняйте копию — она
+              пригодится при смене телефона.
             </p>
           </Card>
         </section>

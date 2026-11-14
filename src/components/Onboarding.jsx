@@ -29,7 +29,7 @@ function Choice({ icon: Icon, title, text, onClick, busy, tone = 'white' }) {
 }
 
 /**
- * Первый запуск: три понятных пути — выписка Freedom (PDF), резервная копия (JSON)
+ * Первый запуск: три понятных пути — PDF-выписка любого банка, резервная копия (JSON)
  * или ручной старт с текущим балансом. Ничего не нужно настраивать заранее.
  */
 export default function Onboarding({ toast }) {
@@ -64,15 +64,15 @@ export default function Onboarding({ toast }) {
         <Choice
           icon={FileText}
           tone="brand"
-          title="Загрузить выписку Freedom Bank"
-          text="PDF из приложения банка — все операции за период"
+          title="Загрузить PDF-выписку банка"
+          text="Kaspi, Freedom, Halyk и другие банки — все операции за период"
           busy={busy === 'parsing-pdf'}
           onClick={() => openPicker('.pdf,application/pdf')}
         />
         <Choice
           icon={FileUp}
           title="Восстановить из резервной копии"
-          text="JSON-файл из «Экспорт данных», например с операциями Kaspi"
+          text="JSON-файл из «Экспорт данных» этого приложения"
           busy={busy === 'reading'}
           onClick={() => openPicker('.json,application/json')}
         />
@@ -130,7 +130,7 @@ export default function Onboarding({ toast }) {
 
         <p className="flex items-start gap-2 px-1 pt-2 text-[12px] leading-snug text-ink-muted">
           <ShieldCheck size={15} className="mt-px shrink-0 text-brand-600" />
-          Файлы, в том числе PDF-выписки, читаются прямо на устройстве и никуда не отправляются. Без регистрации и серверов.
+          PDF-выписки любого банка и JSON-копии читаются прямо на устройстве и никуда не отправляются. Без регистрации и серверов.
         </p>
       </div>
     </div>

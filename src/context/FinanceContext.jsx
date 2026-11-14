@@ -25,8 +25,7 @@ const DEFAULT_SETTINGS = {
 
 const byDateDesc = (a, b) => new Date(b.date) - new Date(a.date);
 const round2 = (n) => Math.round(n * 100) / 100;
-const netOf = (transactions, accountId) =>
-  transactions.filter((t) => t.accountId === accountId).reduce((s, t) => s + (t.type === 'income' ? t.amount : -t.amount), 0);
+const netOf = (transactions, accountId) => transactions.filter((t) => t.accountId === accountId).reduce((s, t) => s + (t.type === 'income' ? t.amount : -t.amount), 0);
 
 function freshState() {
   const transactions = statementTransactions(); // пусто в публичной сборке
@@ -119,8 +118,9 @@ function reducer(state, action) {
       const { transactions: incoming, period, closingBalance, cardName } = action.data;
       const inPeriod = (t) => t.accountId === 'kaspi' && dayKey(t.date) >= period.from && dayKey(t.date) <= period.to;
       const transactions = [...state.transactions.filter((t) => !inPeriod(t)), ...incoming].sort(byDateDesc);
-      // начальный остаток подбираем так, чтобы баланс карты совпал с выпиской
-      const opening = round2(closingBalance - netOf(transactions, 'kaspi'));
+      // начальный остаток подбираем так, чтобы баланс карты совпал с выпиской;
+      // если остатка в выписке нет — прежний начальный остаток (баланс сдвинется на сумму операций)
+      const opening = closingBalance == null ? state.settings.openings.kaspi : round2(closingBalance - netOf(transactions, 'kaspi'));
       return {
         ...state,
         transactions,

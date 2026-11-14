@@ -176,7 +176,7 @@ test('Backward compatibility: legacy localStorage and JSON backup import', async
   await tab(page, 'Профиль');
   const backup = { app: 'tenge-finance', version: 1, transactions: seeded({ balance: 0 }).transactions.slice(0, 12), goals: [], settings: { name: 'Kaspi' } };
   const chooser = page.waitForEvent('filechooser');
-  await page.getByRole('button', { name: /Импорт: JSON или PDF/ }).click();
+  await page.getByRole('button', { name: /Импорт: PDF-выписка или JSON/ }).click();
   await (await chooser).setFiles({ name: 'finance-backup.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(backup)) });
   await page.getByRole('button', { name: 'Заменить данные' }).click();
   await expect(page.getByRole('status')).toContainText('Импортировано: 12');

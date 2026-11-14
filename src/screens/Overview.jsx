@@ -92,7 +92,7 @@ export default function Overview({ now, onSelectTx, onNavigate, toast }) {
             <EmptyState
               icon={Receipt}
               title={transactions.length ? 'Ничего не найдено' : 'Пока нет операций'}
-              text={transactions.length ? 'По этим фильтрам операций нет. Выберите другой период.' : 'Нажмите «+» внизу, чтобы добавить первый доход или расход.'}
+              text={transactions.length ? 'По этим фильтрам операций нет. Выберите другой период.' : 'Нажмите «+» внизу или загрузите PDF-выписку любого банка в Профиле.'}
             />
           )}
           {fxCount > 0 && filters.categoryId !== 'fx' && (

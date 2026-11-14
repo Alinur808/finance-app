@@ -1,5 +1,5 @@
 /**
- * Чтение PDF-выписки в браузере. pdf.js (~1,8 МБ вместе с воркером) грузится
+ * Чтение PDF-выписки любого банка в браузере: банк определяется автоматически (statementParser.js). pdf.js (~1,8 МБ вместе с воркером) грузится
  * только в момент выбора PDF — на скорость открытия приложения он не влияет.
  * Файл не покидает устройство: нет ни одного сетевого запроса с его содержимым.
  *
@@ -11,7 +11,8 @@
  * воркер по URL и не уходит в «fake worker» на главном потоке.
  */
 import './pdfCompat.js'; // до загрузки pdf.js: полифиллы для Safari
-import { describePdfError, extractPdfPages, parseFreedomStatement } from './freedomParser.js';
+import { describePdfError, extractPdfPages } from './freedomParser.js';
+import { parseStatement } from './statementParser.js';
 
 const WORKER_TIMEOUT_MS = 30_000;
 
@@ -75,10 +76,10 @@ function watchWorker(worker, task) {
 }
 
 /**
- * Читает выписку Freedom Bank. Любая ошибка превращается в ImportError:
+ * Читает PDF-выписку Kaspi Gold или Freedom Bank. Любая ошибка превращается в ImportError:
  * message — понятный текст, details — точная причина и этап (видны в интерфейсе).
  */
-export async function readFreedomPdf(file) {
+export async function readStatementPdf(file) {
   let stage = 'loading-modules';
   let page;
   let pdfjs;
@@ -104,7 +105,7 @@ export async function readFreedomPdf(file) {
 
     stage = 'parsing';
     page = undefined;
-    return parseFreedomStatement(pages);
+    return parseStatement(pages);
   } catch (error) {
     if (['starting-worker', 'opening', 'extracting-text'].includes(stage) && error?.name !== 'PasswordException' && error?.name !== 'InvalidPDFException') {
       resetWorker(); // следующая попытка начнёт с чистого воркера
@@ -112,3 +113,6 @@ export async function readFreedomPdf(file) {
     throw describePdfError(error, stage, { page, pdfjsVersion: pdfjs?.version });
   }
 }
+
+/** Прежнее имя — для совместимости. */
+export const readFreedomPdf = readStatementPdf;

@@ -9,7 +9,7 @@ import BottomSheet from '../BottomSheet.jsx';
 
 const ROWS = [
   ['Учёт, аналитика, доходы и расходы', true, true],
-  ['Импорт первой выписки Freedom (PDF)', true, true],
+  ['Первая PDF-выписка любого банка', true, true],
   ['Stealth Mode', true, true],
   ['Советы стратега', String(STANDARD_LIMITS.insights), '∞'],
   ['ИИ-разбор капитала', false, true],

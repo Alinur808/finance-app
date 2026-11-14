@@ -12,18 +12,18 @@ const DEFAULT_ACCEPT = '.json,.pdf,application/json,application/pdf';
 
 /**
  * Нужна ли «история выписок» (Private): на устройстве уже есть операции из
- * выписки Freedom за другой период, и новая выписка добавит ещё один.
+ * PDF-выписки (Kaspi или Freedom) за другой период, и новая выписка добавит ещё один.
  * Первая выписка и повторная загрузка того же периода — бесплатно.
  */
 export function needsStatementHistory(transactions, statement) {
   const { from, to } = statement.period ?? {};
   if (!from || !to) return false;
-  return transactions.some((t) => t.source === 'freedom-pdf' && (dayKey(t.date) < from || dayKey(t.date) > to));
+  return transactions.some((t) => /-pdf$/.test(t.source ?? '') && (dayKey(t.date) < from || dayKey(t.date) > to));
 }
 
 /**
  * Общая логика «Импорт данных» для Профиля и пустого дашборда.
- * Принимает JSON-копию приложения и PDF-выписку Freedom Bank.
+ * Принимает JSON-копию приложения и PDF-выписку любого банка (см. utils/statementParser.js).
  *
  * - openPicker()  открывает системный выбор файла
  * - inputProps    раздайте скрытому <input type="file" {...inputProps} />
