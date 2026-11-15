@@ -2,6 +2,8 @@
 <html lang="ru" data-theme="obsidian">
   <head>
     <meta charset="UTF-8" />
+    <!-- Content-Security-Policy добавляется при сборке (vite.config.js → contentSecurityPolicy) -->
+    <meta name="referrer" content="no-referrer" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Финансы</title>
     <meta name="description" content="Личные финансы: баланс, денежный поток, цели и стратег." />
@@ -18,15 +20,8 @@
     <link rel="icon" type="image/svg+xml" href="./icon.svg" />
     <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png" />
 
-    <!-- тема до первой отрисовки: без вспышки светлого фона (ключ — ThemeContext.jsx) -->
-    <script>
-      try {
-        var t = JSON.parse(localStorage.getItem('tenge-finance.theme') || '"obsidian"');
-        if (t !== 'alabaster') t = 'obsidian';
-        document.documentElement.setAttribute('data-theme', t);
-        if (t === 'alabaster') document.querySelector('meta[name="theme-color"]').setAttribute('content', '#f5f4f0');
-      } catch (e) {}
-    </script>
+    <!-- тема до первой отрисовки и защита от фреймов (без встроенных скриптов — их запрещает CSP) -->
+    <script src="./boot.js"></script>
     <style>
       html, body { background: #050507; }
       html[data-theme='alabaster'], html[data-theme='alabaster'] body { background: #f5f4f0; }

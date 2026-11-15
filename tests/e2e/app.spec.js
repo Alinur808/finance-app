@@ -77,7 +77,8 @@ test('Private Membership paywall: plans, comparison, restore, preview purchase',
   const sheet = page.getByTestId('paywall');
   await expect(sheet).toBeVisible();
   for (const label of ['Месяц', 'Год', 'Навсегда']) await expect(sheet.getByRole('radio', { name: new RegExp(label) })).toBeVisible();
-  await expect(sheet.getByText('Код-пароль', { exact: true })).toBeVisible();
+  await expect(sheet.getByText('Код-пароль и Face ID', { exact: true })).toBeVisible();
+  await expect(sheet.getByTestId('paywall-pillars')).toContainText('Что приложение знает о вас');
   await sheet.getByRole('button', { name: 'Восстановить покупки' }).click();
   await expect(sheet.getByText(/Восстановление работает в приложении/)).toBeVisible();
   await sheet.getByRole('radio', { name: /Месяц/ }).click();
@@ -87,22 +88,18 @@ test('Private Membership paywall: plans, comparison, restore, preview purchase',
   // Free-режим снова закрывает функции
   await page.getByRole('tab', { name: /Free/ }).click();
   await tab(page, 'Планы');
+  await page.getByRole('tab', { name: 'Анализ и профиль' }).click(); // стратег — во втором разделе «Планов»
   await expect(page.getByTestId('locked-insights')).toBeVisible();
   await page.getByTestId('locked-insights').click();
   await expect(page.getByTestId('paywall')).toBeVisible();
 });
 
-test('Passcode Lock: gated for Free, keypad setup, cold-open and background lock', async ({ page }) => {
+test('Passcode Lock: free in Standard, keypad setup, cold-open and background lock', async ({ page }) => {
   await boot(page, { state: seeded() });
   await tab(page, 'Профиль');
   const toggle = page.getByRole('switch', { name: 'Защита код-паролем' });
-  await toggle.click();
-  await expect(page.getByTestId('paywall')).toBeVisible(); // Standard → пейвол
-  await page.getByRole('button', { name: 'Закрыть' }).click();
+  await toggle.click(); // Standard: защита без пейвола
   await expect(page.getByTestId('paywall')).toBeHidden();
-
-  await page.getByRole('tab', { name: 'Private' }).click();
-  await toggle.click();
   const setup = page.getByTestId('passcode-setup');
   await expect(setup).toBeVisible();
   const type = async (root, code) => {

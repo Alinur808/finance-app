@@ -1,18 +1,28 @@
 import { useEffect, useState } from 'react';
 import { useSecurity } from '../../context/SecurityContext.jsx';
 import { useFinance } from '../../context/FinanceContext.jsx';
-import { authenticateBiometric } from '../../native/biometrics.js';
 import { plural } from '../../utils/format.js';
 import PasscodeScreen from './PasscodeScreen.jsx';
 
-/** Экран блокировки: код-пароль, Face ID (в нативной сборке), «Забыли код?». */
+/**
+ * Экран блокировки: код-пароль, Face ID / Touch ID (WebAuthn в браузере и PWA,
+ * нативный плагин в Capacitor), «Забыли код?». Код-пароль — всегда запасной путь.
+ */
 export default function LockScreen() {
-  const { unlock, lockedUntil, canBiometric, biometricsEnabled, unlockWithBiometrics, disablePasscode } = useSecurity();
+  const { unlock, lockedUntil, canBiometric, biometricsEnabled, unlockWithBiometrics, authenticateBiometric, disablePasscode } = useSecurity();
   const { resetAll } = useFinance();
   const [now, setNow] = useState(Date.now());
   const [forgot, setForgot] = useState(false);
+  const [bioNote, setBioNote] = useState('');
   const cooling = now < lockedUntil;
-  const biometric = canBiometric && biometricsEnabled ? async () => (await authenticateBiometric()) && unlockWithBiometrics() : undefined;
+  const biometric =
+    canBiometric && biometricsEnabled
+      ? async ({ silent = false } = {}) => {
+          const result = await authenticateBiometric();
+          if (result === 'ok') return unlockWithBiometrics();
+          if (!silent) setBioNote(result === 'failed' ? 'Face ID не подтвердил личность — введите код' : 'Face ID отменён — введите код или нажмите значок ещё раз');
+        }
+      : undefined;
 
   useEffect(() => {
     if (!cooling) return undefined;
@@ -20,10 +30,11 @@ export default function LockScreen() {
     return () => clearInterval(id);
   }, [cooling]);
 
-  // Face ID — сразу при появлении экрана, как в банковских приложениях
+  // Face ID — сразу при появлении экрана, как в банковских приложениях.
+  // Safari может потребовать нажатия: тогда тихо ждём касания значка Face ID.
   useEffect(() => {
-    biometric?.();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    biometric?.({ silent: true });
+  }, [canBiometric, biometricsEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const seconds = Math.ceil((lockedUntil - now) / 1000);
 
@@ -60,9 +71,11 @@ export default function LockScreen() {
     <PasscodeScreen
       testId="lock-screen"
       title="Введите код-пароль"
-      subtitle={cooling ? `Слишком много попыток. Повторите через ${plural(seconds, ['секунду', 'секунды', 'секунд'])}` : 'Приложение заблокировано'}
+      subtitle={
+        cooling ? `Слишком много попыток. Повторите через ${plural(seconds, ['секунду', 'секунды', 'секунд'])}` : bioNote || (biometric ? 'Face ID / Touch ID или код-пароль' : 'Приложение заблокировано')
+      }
       disabled={cooling}
-      onBiometric={biometric}
+      onBiometric={biometric ? () => biometric() : undefined}
       onComplete={(code) => {
         const result = unlock(code);
         if (result === 'ok') return true;

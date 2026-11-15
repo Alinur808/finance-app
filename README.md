@@ -52,24 +52,48 @@ The workflow runs `npm run build:public`, so the published site contains no bank
 2. In the app, go to **Профиль → Импорт данных** and choose a backup exported from your local build. That loads your transactions, goals and balance on the phone.
 
 ## Design system: Obsidian & Alabaster
-Colours are CSS variables in `src/index.css` (`R G B` triplets), mapped in `tailwind.config.js`, so the same classes (`bg-surface`, `text-ink-muted`, `bg-red-50`…) work in both themes. **Obsidian** (default) is an OLED dark theme: `#050507` canvas, `#0E1015` surfaces, 8 % white hairlines, emerald `#10B981` for income and coral for spending. **Alabaster** is the daylight theme. The theme lives in `localStorage['tenge-finance.theme']` (device preference, not part of backups); an inline script in `index.html` applies it before first paint. Inter is self-hosted (`@fontsource-variable/inter`), so it works offline and inside Capacitor. All numbers use tabular figures; balances use `FitText`, which shrinks the font so anything from `0 ₸` to `999 999 999 999 ₸` fits on one line.
+Colours are CSS variables in `src/index.css` (`R G B` triplets), mapped in `tailwind.config.js`, so the same classes (`bg-surface`, `text-ink-muted`, `bg-red-50`…) work in both themes. **Obsidian** (default) is an OLED dark theme: `#050507` canvas, `#0E1015` surfaces, 8 % white hairlines, emerald `#10B981` for income and coral for spending. **Alabaster** is the daylight theme. The theme lives in `localStorage['tenge-finance.theme']` (device preference, not part of backups); `public/boot.js` applies it before first paint. Inter is self-hosted (`@fontsource-variable/inter`), so it works offline and inside Capacitor. All numbers use tabular figures; balances use `FitText`, which shrinks the font so anything from `0 ₸` to `999 999 999 999 ₸` fits on one line.
 
 ## Privacy & security
-- **Stealth Mode** — the eye on the balance card (or Профиль → Приватность). Every amount on Обзор, Аналитика and Планы becomes `•••••• ₸`; charts stay usable. It reuses the existing `settings.hideBalance` flag, so old data and backups work unchanged (`src/hooks/usePrivacy.js`).
-- **Passcode Lock** — Профиль → Защита код-паролем (Private). Locks on cold open and whenever the app goes to the background (`visibilitychange`); system pickers (file import, share sheet) pause auto-lock. Only a salted, iterated SHA-256 hash is stored (`localStorage['tenge-finance.security']`), never in backups. Five wrong attempts → 30 s cooldown. «Забыли код?» offers a full device reset. Face ID / Touch ID: install a Capacitor plugin with the `capacitor-native-biometric` API and the lock screen shows the Face ID button automatically (`src/native/biometrics.js`).
+- **Encryption at rest** (`src/utils/vault.js`). The whole app state lives in `localStorage['tenge-finance.vault']`, encrypted with AES-GCM-256. The key is derived with PBKDF2-SHA-256 (120 000 iterations) from a random 256-bit device secret that is stored separately, in IndexedDB (`tenge-finance-keys`); only if IndexedDB is unavailable does it fall back to localStorage (the record's `ks` field says which). Every save uses a fresh 12-byte IV and authenticated context data. `main.jsx` opens the vault before the first render. Old plaintext data (`tenge-finance.v2`) is encrypted on first launch, re-read and compared, and only then deleted, so no transaction is lost. A vault that cannot be decrypted is never overwritten: the app shows a notice and saves nothing until the user chooses «Начать заново». Over plain http on a LAN (no Web Crypto) the app keeps the old unencrypted format. Scope: this protects data at rest (storage inspection, profile dumps); it can't protect against code already running on the page, which is why the passcode, Face ID and the privacy curtain exist.
+- **Privacy curtain** (`src/utils/privacyCurtain.js`). On `blur`, `pagehide` and `visibilitychange → hidden`, a class on `<html>` shows an opaque Obsidian layer synchronously, inside the event handler, so the iOS/Android app switcher snapshot never shows balances.
+- **Content-Security-Policy.** Builds get a strict `<meta http-equiv="Content-Security-Policy">` (`vite.config.js`): `script-src 'self'` (no inline scripts, no eval), `worker-src 'self' blob:` for pdf.js, `connect-src 'self' https://api.anthropic.com`, `object-src 'none'`. The theme script moved to `public/boot.js`, which also hides the app when it's framed (GitHub Pages can't send `frame-ancestors`). Dev mode has no CSP because Vite HMR needs inline scripts.
+- **Input sanitizing** (`src/utils/sanitize.js`). `?quickAdd=` link parameters, PDF merchant names and JSON backups go through allow-lists. Control, zero-width and bidi characters and angle brackets are stripped, lengths are capped, amounts must be finite and positive, and unknown keys are dropped, including `__proto__`. Links never save anything without a tap.
+- **AI key isolation** (`src/utils/secrets.js`). The optional beta API key lives only in `sessionStorage`. It is never written to the vault, localStorage or exports, and it is gone when the app closes. Keys saved by older versions are moved there on first launch.
+- **Stealth Mode**: the eye on the balance card. Every amount on Обзор, Аналитика and Планы becomes `•••••• ₸`, including all new cards; percentages and charts stay (`src/hooks/usePrivacy.js`, the existing `settings.hideBalance` flag).
+- **Passcode Lock + Face ID / Touch ID** are free in Standard. The 4-digit code is stored as a salted, iterated SHA-256 hash (`localStorage['tenge-finance.security']`, never in backups); five wrong attempts → 30 s cooldown. Face ID works in mobile Safari and Chrome PWAs today through **WebAuthn** (`src/utils/webauthn.js`): a platform passkey with `userVerification: 'required'`. Unlocking checks the challenge, origin, UV flag and the ES256/RS256 signature locally, with no server. The PIN is always the fallback. In Capacitor, the native plugin (`src/native/biometrics.js`) is used instead.
+
+## Plans: «Цель и темп трат»
+The Планы tab has two pills instead of two long stacked sections:
+- **Цель и дневник** has one hero card with the active goal's progress, «Сегодня можно потратить X ₸», the projected completion date and a status badge (`src/utils/pace.js`: the Financial Diary's daily limit when a plan exists, otherwise income − required goal savings − month-to-date spending, spread over the rest of the month). Below it come «Эта неделя» (spending since Monday, the optional **Недельный лимит трат**, «Итоги недели») and a compact Financial Diary.
+- **Анализ и профиль** holds «Что приложение знает обо мне», Главные цифры, the Strategist (with «Что изменилось»: month-over-month deltas and anomalies) and multi-currency capital.
+
+## Tester features
+- **Percentages for every category**: Top Spending (with «Все категории») and Analytics. `formatShare` shows one decimal below 10 %.
+- **Voice input** (`src/hooks/useSpeech.js`, `src/utils/voiceParser.js`). The mic button in «Новая операция» uses Web Speech `ru-RU`. «Такси две пятьсот» → 2 500 ₸ Транспорт, «Кофе 1800», «Зарплата 300 тысяч», «полторы тысячи», «300к». Standard allows 3 phrases a day.
+- **«Стоит ли оно того?»** (`src/utils/worthIt.js`). Under the amount: «≈ 4,5 часа работы». The hourly rate is auto-estimated from income (salary first) ÷ 168 h, or set with a 1-tap popover. Private adds «отложит цель на +N дней» and a simulator in Планы (one-off, weekly, monthly).
+- **Behavioral DNA** (`src/utils/userProfileAnalyzer.js`): peak weekday, weekend share, late-night spending (PDF rows without a real time are ignored), small purchases under 3 000 ₸, recurring payments, archetype, traits and 3 actions with ₸/month impact. Standard sees a teaser.
+- **Weekly recap and guardrail** (`src/utils/weekly.js`). «Итоги недели» appears on Обзор on Sunday and Monday (dismissible) and is always available in Планы. When the weekly limit is reached, the banner reads «Лимит недели исчерпан — траты остановлены», and a new expense needs confirmation.
+- **Apple Pay automation**. Профиль → «Автоматизация Apple Pay (Команды iOS)» copies the live link `…/?quickAdd=1&type=expense&amount=&merchant=` and shows a 3-step guide. The link opens a pre-filled sheet; nothing is saved without a tap.
+
+## PWA auto-update
+The service worker (`vite-plugin-pwa`, workbox) calls `skipWaiting()` and `clientsClaim()` and cleans outdated caches. `src/pwa.js` registers it, checks for updates on every return to the app and every 30 minutes, and on `controllerchange` silently reloads after flushing the encrypted save. It waits while a sheet is open, so a half-typed transaction is never lost. Testers get each push to `main` without clearing caches. The very first update after this release is picked up on the next app launch, because the previously installed version had no reload hook.
 
 ## Membership (Standard / Private)
-`src/context/SubscriptionContext.jsx` gates features; plans and limits live in `src/data/membership.js`.
+`src/context/SubscriptionContext.jsx` gates features; plans, the four Private pillars, limits and the comparison table live in `src/data/membership.js`.
 
 | | Standard (free) | Private |
 |---|---|---|
-| Manual tracking, analytics, cash-flow chart, Stealth Mode | ✓ | ✓ |
-| First Freedom PDF import (and re-importing the same period) | ✓ | ✓ |
+| Manual tracking, PDF import for all banks, categories with %, «Сегодня можно потратить» | ✓ | ✓ |
+| Passcode + Face ID, Stealth Mode, weekly recap and limit | ✓ | ✓ |
+| «Что приложение знает обо мне» | teaser | full portrait + subscription leak radar |
+| «Стоит ли оно того?» | work hours | + goal delay, what-if, yearly habit cost |
+| AI analyst: month-over-month, anomalies, Claude review | — | ✓ |
+| Voice input | 3 / day | unlimited |
 | Strategist insights | 2 | unlimited |
-| AI capital review (Claude, own API key) | — | ✓ |
-| Statements for several periods | — | ✓ |
+| Statement archive (several periods) | 1 period | unlimited |
+| Multi-currency capital ($, €, AED) | — | ✓ |
 | Financial Diary goals | 3 | unlimited |
-| Passcode Lock | — | ✓ |
 
 Limits never delete existing data: users who already have more diary goals keep them, and an existing passcode keeps working after a downgrade. In the web build, «Режим подписки (Preview)» in Профиль switches tiers and «purchases» activate Private locally without charging. In Capacitor, install `@revenuecat/purchases-capacitor`, call `configureBilling({ apiKey })` from `src/native/billing.js` at startup, and create products `private_monthly`, `private_annual`, `private_lifetime` attached to the entitlement `private`. The preview toggle hides itself once the store plugin is present.
 
@@ -84,6 +108,8 @@ npm run build:public && npx cap add ios && npx cap add android && npx cap sync
 `npm run fixtures` generates synthetic statements, all with invented data: Freedom (208 rows, 14 234,77 ₸), Kaspi Gold (120 rows, 87 412,35 ₸, Kaspi Депозит moves, USD lines, split amounts, wrapped details), Halyk (64 rows + 16 fee rows), Emirates NBD in AED (58 rows, universal parser), and an image-only "scan".
 
 - `npm run test:unit` checks number/date formats, the categorizer, the universal parser on Revolut-, ForteBank-, US- and Wio-style layouts, and every fixture PDF through pdf.js.
+- `npm run test:unit` also covers the vault (encryption, migration, no overwrite of an unreadable vault), sanitizing, the voice parser, «Стоит ли оно того?», the behavior analyzer, weekly recap and limit, safe-to-spend, month-over-month and anomalies, and WebAuthn signature verification (`tests/unit/upgrade.test.js`).
+- `tests/e2e/upgrade.spec.js` checks the plaintext → encrypted migration (decrypting the vault in the page), the CSP with zero violations including PDF import, real WebAuthn registration and unlock through Chromium's virtual authenticator with PIN fallback, the Plans layout, Stealth Mode on every new card, voice input (mocked recognition), Worth It, the Sunday recap and weekly guardrail, `?quickAdd=` sanitizing with no auto-commit, the Shortcuts link, the privacy curtain, AI key isolation, category percentages, and the service-worker reload that waits for an open sheet.
 - `npm run test:e2e` runs Playwright on a 390×844 viewport with an iPhone user agent. It covers billion-scale balances, Stealth Mode, themes, the paywall, Passcode Lock, cash-flow scrubbing, 16 px inputs, legacy data and JSON import. It also imports every bank's PDF while simulating iOS Safari: `Promise.withResolvers` and the `ReadableStream` async iterator are deleted on the page and inside the pdf.js worker. Further checks: the merge rules, the FX-rate confirmation and the scanned-PDF message.
 
 To check your own statements:
@@ -96,8 +122,10 @@ FREEDOM_PDF=~/Downloads/freedom.pdf FREEDOM_ROWS=208 FREEDOM_BALANCE="14 234,77"
 src/
   data/        categories (pastel icon colours), accounts, statement.json, seed loader
   utils/       dates/periods (ru), money formatting (ru), analytics, advisor, backup,
-               statement engine: statementParser, freedom/kaspi/halyk parsers, universalStatementParser, categorizer, fxRates
-  context/     FinanceContext (reducer + localStorage), Theme, Subscription, Security
+               statement engine: statementParser, freedom/kaspi/halyk parsers, universalStatementParser, categorizer, fxRates,
+               security: vault, sanitize, secrets, webauthn, privacyCurtain; features: pace, weekly, worthIt,
+               voiceParser, userProfileAnalyzer
+  context/     FinanceContext (reducer + encrypted vault), Theme, Subscription, Security
   components/  BalanceCard, CashflowChart, FilterChips, TransactionList, sheets, goals/*, security/*, membership/*
   native/      Capacitor bridges: haptics lookup, biometrics, RevenueCat billing
   screens/     Overview, Analytics, Goals, Profile
@@ -108,4 +136,5 @@ tests/         e2e/*.spec.js (Playwright), fixtures/ (synthetic data and PDF gen
 ## Advisor (`src/utils/advisor.js`)
 - `buildAdvice()` is rule-based. It averages cash flow over the last 60 days, or over the available data if there is less. It compares how many weeks the goal will take with the weeks left before the deadline. It ranks quantified tips: the top flexible category, food delivery, taxi vs metro, small purchases, transfer fees, the 50/30/20 savings rate, and "pay yourself first".
 - `buildTelemetry()` (`src/utils/telemetry.js`) feeds «Главные цифры» on Планы: «Расход в месяц» (and per day), «Откладываете» (share of income saved), «Запас денег» (days the balance lasts at the current spending) and «Главная статья» (largest category's share), over the same 60-day window. All user-facing copy is plain Russian — no banking jargon or English terms.
-- `getAIAdvice()` is the LLM hook (Private). When an API key is saved in Профиль, the Goals screen shows «ИИ-разбор капитала». The button sends the goal, the monthly summary and the transactions from the last 60 days to Claude (`claude-opus-5-5`) through `@anthropic-ai/sdk` from the browser. Server-side refusal fallbacks are enabled. The OpenAI path is a TODO stub. The key lives only in localStorage and is never included in exports. For anything beyond personal use, move this call to a server.
+- `monthOverMonth()` and `detectAnomalies()` compare this month with the same days of last month by category and flag purchases at least 3× the category median (and at least 10 000 ₸). `describeChanges()` turns them into plain Russian for «Что изменилось».
+- `getAIAdvice()` is the LLM hook (Private). When an API key is entered in Профиль, Планы → Анализ и профиль shows «ИИ-разбор капитала». The button sends the goal, the monthly summary, the month-over-month deltas, anomalies, a persona summary (archetype and traits, no names) and the transactions from the last 60 days to Claude (`claude-opus-5-5`) through `@anthropic-ai/sdk` from the browser. Server-side refusal fallbacks are enabled. The OpenAI path is a TODO stub. The key lives only in sessionStorage and is never included in exports. For anything beyond personal use, move this call to a server.

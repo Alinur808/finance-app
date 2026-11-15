@@ -3,10 +3,23 @@ import { statementTransactions } from '../data/seed.js';
 import { ACCOUNTS } from '../data/accounts.js';
 import { createEmptyPlan } from '../utils/plan.js';
 import { dayKey } from '../utils/dates.js';
+import { setAiKey } from '../utils/secrets.js';
+import { LEGACY_KEY } from '../utils/vault.js';
 
-const STORAGE_KEY = 'tenge-finance.v2';
-const SAVE_DELAY_MS = 400;
+/**
+ * Состояние приложения. Хранится зашифрованным (utils/vault.js): main.jsx
+ * открывает сейф до первой отрисовки и передаёт сюда `vault`
+ * ({ state, status, save, flush }). Формат состояния прежний — старые
+ * резервные копии и данные из tenge-finance.v2 подходят без изменений.
+ */
+const SAVE_DELAY_MS = 250;
 const FinanceContext = createContext(null);
+
+// последняя функция «сохранить сейчас» — для автообновления PWA (сохраняем перед перезагрузкой)
+let saveNowRef = null;
+export async function flushFinanceState() {
+  await saveNowRef?.();
+}
 
 const DEFAULT_FILTERS = { period: 'month', accountId: 'all', categoryId: null };
 const DEFAULT_SETTINGS = {
@@ -15,8 +28,10 @@ const DEFAULT_SETTINGS = {
   hideBalance: false,
   monthlyBudget: 0, // 0 — бюджет не задан, карточка бюджета скрыта
   name: '',
-  aiApiKey: '',
+  // ключ ИИ больше не хранится в данных — только в sessionStorage (utils/secrets.js)
   aiProvider: 'anthropic',
+  weeklyLimit: 0, // 0 — недельный лимит трат выключен
+  hourlyRate: 0, // 0 — ставка «час работы» считается по доходам автоматически
   // своё название карты, например «Kaspi Gold» или «Freedom Super Card»; пусто — «Основная карта»
   cardName: '',
   // начальные балансы счетов; попадают в резервную копию вместе с операциями
@@ -39,22 +54,35 @@ function freshState() {
   };
 }
 
-function loadState() {
+/** Состояние из сейфа (или старого tenge-finance.v2) → состояние приложения. */
+export function hydrateState(parsed) {
+  if (!parsed || !Array.isArray(parsed.transactions)) return freshState();
+  const { aiApiKey, ...savedSettings } = parsed.settings ?? {};
+  // ключ ИИ из старых версий: переносим в sessionStorage, из данных — удаляем
+  if (aiApiKey) setAiKey(aiApiKey);
+  const settings = { ...DEFAULT_SETTINGS, ...savedSettings };
+  // данные из версий до экрана первого запуска: пользователь уже «в приложении»
+  if (parsed.settings?.onboarded === undefined) settings.onboarded = parsed.transactions.length > 0 || (parsed.goals?.length ?? 0) > 0;
+  return { ...freshState(), ...parsed, settings, plan: parsed.plan ?? createEmptyPlan(), filters: DEFAULT_FILTERS };
+}
+
+/** Без сейфа (тесты, старые вызовы): синхронно из открытого tenge-finance.v2. */
+function loadState(vault) {
+  if (vault) return hydrateState(vault.state);
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed.transactions)) {
-        const settings = { ...DEFAULT_SETTINGS, ...parsed.settings };
-        // данные из версий до экрана первого запуска: пользователь уже «в приложении»
-        if (parsed.settings?.onboarded === undefined) settings.onboarded = parsed.transactions.length > 0 || (parsed.goals?.length ?? 0) > 0;
-        return { ...freshState(), ...parsed, settings, plan: parsed.plan ?? createEmptyPlan(), filters: DEFAULT_FILTERS };
-      }
-    }
+    const raw = localStorage.getItem(LEGACY_KEY);
+    if (raw) return hydrateState(JSON.parse(raw));
   } catch {
     /* хранилище недоступно (приватный режим) — начинаем с чистого листа */
   }
   return freshState();
+}
+
+/** То, что попадает в хранилище: без фильтров экрана и без секретов. */
+export function persistable(state) {
+  const { filters, ...rest } = state;
+  const { aiApiKey, ...settings } = rest.settings;
+  return { ...rest, settings };
 }
 
 function reducer(state, action) {
@@ -107,8 +135,8 @@ function reducer(state, action) {
         transactions: [...action.data.transactions].sort(byDateDesc),
         goals: action.data.goals ?? state.goals,
         activeGoalId: action.data.goals?.[0]?.id ?? state.activeGoalId,
-        // ключ ИИ никогда не попадает в файл экспорта — сохраняем текущий
-        settings: { ...state.settings, ...(action.data.settings ?? {}), aiApiKey: state.settings.aiApiKey, onboarded: true },
+        // настройки из файла уже очищены (utils/sanitize.js); ключ ИИ в файл не попадает
+        settings: { ...state.settings, ...(action.data.settings ?? {}), onboarded: true },
         plan: action.data.plan ?? state.plan,
         filters: DEFAULT_FILTERS,
       };
@@ -151,20 +179,42 @@ function reducer(state, action) {
   }
 }
 
-export function FinanceProvider({ children }) {
-  const [state, dispatch] = useReducer(reducer, undefined, loadState);
+export function FinanceProvider({ children, vault = null }) {
+  const [state, dispatch] = useReducer(reducer, vault, loadState);
   const latest = useRef(state);
   latest.current = state;
+  const [vaultStatus, setVaultStatus] = useState(vault?.status ?? 'plain');
+  const vaultRef = useRef(vault);
+
+  const saveNow = useMemo(
+    () => async () => {
+      const v = vaultRef.current;
+      const data = persistable(latest.current);
+      if (v) {
+        v.save(data);
+        await v.flush();
+        return;
+      }
+      try {
+        localStorage.setItem(LEGACY_KEY, JSON.stringify(data));
+      } catch {
+        /* переполнено хранилище или приватный режим */
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    saveNowRef = saveNow;
+    return () => {
+      if (saveNowRef === saveNow) saveNowRef = null;
+    };
+  }, [saveNow]);
 
   // Сохраняем с задержкой (не на каждое нажатие клавиши) и сразу — когда приложение уходит в фон.
   useEffect(() => {
     const save = () => {
-      try {
-        const { filters, ...persisted } = latest.current;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(persisted));
-      } catch {
-        /* переполнено хранилище или приватный режим */
-      }
+      saveNow();
     };
     const timer = setTimeout(save, SAVE_DELAY_MS);
     window.addEventListener('pagehide', save);
@@ -175,7 +225,17 @@ export function FinanceProvider({ children }) {
       window.removeEventListener('pagehide', save);
       document.removeEventListener('visibilitychange', onHidden);
     };
-  }, [state]);
+  }, [state, saveNow]);
+
+  /** Сейф не открылся (ключ потерян): пользователь сам решает начать заново. */
+  const discardUnreadableVault = useMemo(
+    () => () => {
+      vaultRef.current?.discard?.();
+      setVaultStatus('plain');
+      dispatch({ type: 'resetAll' });
+    },
+    [],
+  );
 
   const actions = useMemo(
     () => ({
@@ -199,7 +259,10 @@ export function FinanceProvider({ children }) {
     [],
   );
 
-  const value = useMemo(() => ({ ...state, ...actions }), [state, actions]);
+  const value = useMemo(
+    () => ({ ...state, ...actions, vaultStatus, encrypted: Boolean(vault?.encrypted) && vaultStatus !== 'unreadable', discardUnreadableVault, saveNow }),
+    [state, actions, vaultStatus, vault, discardUnreadableVault, saveNow],
+  );
   return <FinanceContext.Provider value={value}>{children}</FinanceContext.Provider>;
 }
 

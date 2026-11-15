@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Receipt } from 'lucide-react';
+import { Receipt, ShieldAlert } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext.jsx';
 import { ACCOUNTS } from '../data/accounts.js';
 import { useAccounts } from '../hooks/useAccounts.js';
@@ -16,6 +16,8 @@ import FilterChips from '../components/FilterChips.jsx';
 import TopSpending from '../components/TopSpending.jsx';
 import TransactionList from '../components/TransactionList.jsx';
 import { Card, EmptyState, SectionHeader } from '../components/ui.jsx';
+import WeeklyRecapCard from '../components/weekly/WeeklyRecapCard.jsx';
+import { weeklyLimitState } from '../utils/weekly.js';
 
 const TX_WORDS = ['операция', 'операции', 'операций'];
 
@@ -47,6 +49,7 @@ export default function Overview({ now, onSelectTx, onNavigate, toast }) {
   // Строка дневника — только если план заполнен
   const hasPlan = plan.items.length > 0 || plan.incomes.length > 0;
   const forecast = useMemo(() => (hasPlan ? buildPlanForecast({ plan, balance: total, transactions, now }) : null), [hasPlan, plan, total, transactions, now]);
+  const weekly = useMemo(() => weeklyLimitState(transactions, settings.weeklyLimit, now), [transactions, settings.weeklyLimit, now]);
 
   // Первый запуск: ни операций, ни ручного старта — показываем выбор, а не пустые графики.
   if (!settings.onboarded && transactions.length === 0) return <Onboarding toast={toast} />;
@@ -65,7 +68,24 @@ export default function Overview({ now, onSelectTx, onNavigate, toast }) {
           </p>
         )}
 
-        {forecast && !forecast.isOver && <DiarySummary forecast={forecast} hidden={hidden} onOpen={() => onNavigate('goals', 'diary')} />}
+        {weekly?.exhausted && (
+          <button
+            onClick={() => onNavigate('goals', 'cockpit')}
+            className="pressable flex w-full items-center gap-2.5 rounded-3xl bg-red-600 px-4 py-3.5 text-left text-white shadow-card"
+            role="alert"
+            data-testid="weekly-limit-banner"
+          >
+            <ShieldAlert size={20} className="shrink-0" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-[15px] font-bold leading-tight">Лимит недели исчерпан — траты остановлены</span>
+              <span className="block text-[12px] opacity-85">Новые расходы — только с подтверждением</span>
+            </span>
+          </button>
+        )}
+
+        <WeeklyRecapCard now={now} />
+
+        {forecast && !forecast.isOver && <DiarySummary forecast={forecast} hidden={hidden} onOpen={() => onNavigate('goals', 'cockpit')} />}
 
         <FilterChips />
 

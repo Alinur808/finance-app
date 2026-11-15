@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test } from '@playwright/test';
-import { boot, seeded, tab } from './helpers.js';
+import { boot, readVaultState, seeded, tab } from './helpers.js';
 
 /**
  * Импорт PDF-выписок в условиях iOS Safari: до запуска страницы и воркера pdf.js
@@ -122,10 +122,8 @@ test('Kaspi import merges: keeps cash, other months, goals and a custom card nam
   await page.getByRole('button', { name: 'Загрузить выписку' }).click({ timeout: 45_000 });
   await expect(page.getByRole('status')).toContainText('Выписка загружена: 120');
 
-  const saved = await page.evaluate(async () => {
-    await new Promise((r) => setTimeout(r, 600)); // сохранение в localStorage с задержкой
-    return JSON.parse(localStorage.getItem('tenge-finance.v2'));
-  });
+  const saved = await readVaultState(page); // данные зашифрованы — читаем через сейф
+  expect(await page.evaluate(() => localStorage.getItem('tenge-finance.v2'))).toBeNull();
   expect(saved.transactions.length).toBe(kept + 120);
   expect(saved.transactions.some((t) => t.id === 'cash-oct')).toBe(true); // наличные за период — на месте
   expect(saved.transactions.some((t) => t.id === 'card-sep')).toBe(true); // другие месяцы — на месте

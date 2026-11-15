@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { AlertTriangle, BadgeCheck, Bot, CalendarClock, Lightbulb, Loader2, Lock, PartyPopper, PenLine, Repeat, Scale, Sparkles, TrendingDown, Zap } from 'lucide-react';
+import { Bot, CalendarClock, Lightbulb, Loader2, Lock, Repeat, Scale, Sparkles, Zap } from 'lucide-react';
 import { useFinance } from '../../context/FinanceContext.jsx';
 import { useSubscription } from '../../context/SubscriptionContext.jsx';
 import { usePrivacy } from '../../hooks/usePrivacy.js';
@@ -9,19 +9,16 @@ import { formatMoney, formatPercent, plural } from '../../utils/format.js';
 import CategoryIcon from '../CategoryIcon.jsx';
 import { Card } from '../ui.jsx';
 import WhatIfSimulator from './WhatIfSimulator.jsx';
+import ChangesCard from './ChangesCard.jsx';
+import { GOAL_STATUS } from './goalStatus.js';
+import { useAiKey } from '../../utils/secrets.js';
 
 /** Расчётные суммы показываем без тиынов. */
 const money = (v, opts = {}) => formatMoney(v, { decimals: false, ...opts });
 
-const VISIBLE_TIPS = 3;
+const VISIBLE_TIPS = 2; // остальные — по кнопке «Ещё советы», чтобы раздел не превращался в длинную ленту
 
-const STATUS = {
-  'on-track': { icon: BadgeCheck, label: 'Успеваете', cls: 'bg-brand-50 text-brand-700 ring-brand-500/20' },
-  behind: { icon: AlertTriangle, label: 'Отстаёте от плана', cls: 'bg-amber-50 text-amber-800 ring-amber-500/20' },
-  negative: { icon: TrendingDown, label: 'Тратите больше, чем получаете', cls: 'bg-red-50 text-red-700 ring-red-500/20' },
-  done: { icon: PartyPopper, label: 'Цель достигнута', cls: 'bg-brand-50 text-brand-700 ring-brand-500/20' },
-  'no-data': { icon: PenLine, label: 'Мало данных', cls: 'bg-gray-100 text-ink-soft ring-hairline' },
-};
+const STATUS = GOAL_STATUS;
 
 export const NO_DATA_MESSAGE = 'Пока недостаточно данных для анализа. Добавьте свои первые доходы и расходы, чтобы я мог дать финансовый совет!';
 
@@ -44,9 +41,9 @@ function statusSentence(a, goal) {
 }
 
 /** Советник: статус цели, денежный поток, советы, симулятор и (если есть ключ) ИИ-совет. */
-export default function AdvisorPanel({ advice, goal }) {
+export default function AdvisorPanel({ advice, goal, now = new Date() }) {
   const [allTips, setAllTips] = useState(false);
-  const { limits, openPaywall } = useSubscription();
+  const { limits, openPaywall, isPrivate } = useSubscription();
   const { text } = usePrivacy();
   useEffect(() => setAllTips(false), [goal.id]);
   const unlocked = advice.tips.slice(0, limits.insights);
@@ -100,6 +97,7 @@ export default function AdvisorPanel({ advice, goal }) {
         )}
       </Card>
 
+      {advice.status !== 'no-data' && <ChangesCard now={now} />}
       {advice.status !== 'done' && advice.status !== 'no-data' && <AIAdviceCard goal={goal} />}
 
       {advice.tips.length > 0 && advice.status !== 'done' && (
@@ -158,7 +156,21 @@ export default function AdvisorPanel({ advice, goal }) {
         </div>
       )}
 
-      {advice.status !== 'done' && advice.discretionary.length > 0 && <WhatIfSimulator advice={advice} goal={goal} />}
+      {advice.status !== 'done' &&
+        advice.discretionary.length > 0 &&
+        (isPrivate ? (
+          <WhatIfSimulator advice={advice} goal={goal} />
+        ) : (
+          <button onClick={() => openPaywall('worthIt')} className="pressable flex w-full items-center gap-3 rounded-3xl bg-surface p-4 text-left shadow-card" data-testid="whatif-locked">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-amber-50 text-amber-700">
+              <Lock size={17} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[15px] font-semibold">Что, если тратить меньше?</span>
+              <span className="block text-[13px] text-ink-muted">Сценарии и новая дата цели — в Private</span>
+            </span>
+          </button>
+        ))}
     </section>
   );
 }
@@ -166,6 +178,7 @@ export default function AdvisorPanel({ advice, goal }) {
 /** Появляется, только если в Профиле указан ключ API. */
 function AIAdviceCard({ goal }) {
   const { settings, transactions } = useFinance();
+  const [aiKey] = useAiKey();
   const { isPrivate, openPaywall } = useSubscription();
   const { text } = usePrivacy();
   const [state, setState] = useState({ status: 'idle', text: '', error: '' });
@@ -173,7 +186,7 @@ function AIAdviceCard({ goal }) {
   useEffect(() => () => abortRef.current?.abort(), []);
   useEffect(() => setState({ status: 'idle', text: '', error: '' }), [goal.id]);
 
-  if (!settings.aiApiKey) return null;
+  if (!aiKey) return null;
   if (!isPrivate) {
     return (
       <button onClick={() => openPaywall('aiAdvisor')} className="pressable flex w-full items-center gap-3 rounded-3xl bg-surface p-4 text-left shadow-card">
@@ -193,7 +206,7 @@ function AIAdviceCard({ goal }) {
     abortRef.current = ctrl;
     setState({ status: 'loading', text: '', error: '' });
     try {
-      const text = await getAIAdvice({ apiKey: settings.aiApiKey, provider: settings.aiProvider, transactions, goal, signal: ctrl.signal });
+      const text = await getAIAdvice({ apiKey: aiKey, provider: settings.aiProvider, transactions, goal, signal: ctrl.signal });
       setState({ status: 'done', text, error: '' });
     } catch (e) {
       if (ctrl.signal.aborted) return;

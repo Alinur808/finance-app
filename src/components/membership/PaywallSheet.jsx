@@ -1,28 +1,21 @@
 import { useEffect, useState } from 'react';
-import { Check, Loader2, Minus } from 'lucide-react';
+import { Bot, Check, Fingerprint, Globe2, Loader2, Minus, Scale } from 'lucide-react';
 import { useSubscription } from '../../context/SubscriptionContext.jsx';
-import { FEATURES, STANDARD_LIMITS } from '../../data/membership.js';
+import { COMPARISON, FEATURES, PILLARS } from '../../data/membership.js';
 import { loadStorePrices, PLANS } from '../../native/billing.js';
 import { groupDigits } from '../../utils/format.js';
 import { haptic } from '../../utils/haptics.js';
 import BottomSheet from '../BottomSheet.jsx';
 
-const ROWS = [
-  ['Учёт, аналитика, доходы и расходы', true, true],
-  ['Первая PDF-выписка любого банка', true, true],
-  ['Stealth Mode', true, true],
-  ['Советы стратега', String(STANDARD_LIMITS.insights), '∞'],
-  ['ИИ-разбор капитала', false, true],
-  ['История выписок', '1 период', '∞'],
-  ['Цели дневника', String(STANDARD_LIMITS.diaryItems), '∞'],
-  ['Код-пароль', false, true],
-];
+const PILLAR_ICON = { behaviorPortrait: Fingerprint, worthIt: Scale, aiAnalyst: Bot, capital: Globe2 };
 
 const price = (plan, store) => store?.[plan.id] ?? `${groupDigits(plan.price)} ₸`;
 
 /**
- * «Private Membership» — сдержанный лист покупки в стиле Apple:
- * тарифы, сравнение возможностей, «Восстановить покупки» и условия подписки.
+ * «Private Membership» — сдержанный лист покупки в стиле Apple.
+ * Сначала — четыре столпа, ради которых стоит платить (портрет привычек,
+ * «Стоит ли оно того?», ИИ-аналитик и голос, капитал и архив), затем тарифы,
+ * честное сравнение со Standard, «Восстановить покупки» и условия подписки.
  */
 export default function PaywallSheet({ open, feature, onClose }) {
   const { isPrivate, plan: currentPlan, source, hasStore, purchase, restore } = useSubscription();
@@ -104,13 +97,33 @@ export default function PaywallSheet({ open, feature, onClose }) {
         >
           P
         </div>
-        <p className="mt-4 text-[22px] font-semibold leading-tight tracking-[-0.02em]">Капитал под личным контролем</p>
+        <p className="mt-4 text-[22px] font-semibold leading-tight tracking-[-0.02em]">Финансы, которые понимают вас</p>
         <p className="mt-1.5 max-w-[300px] text-[14px] leading-snug text-ink-soft">
-          Инструменты private-банкинга для личного капитала. Данные по-прежнему остаются только на устройстве.
+          Standard честно ведёт учёт. Private объясняет, почему уходят деньги, и показывает цену каждой покупки — всё на устройстве, без серверов.
         </p>
       </div>
 
-      {focus && !isPrivate && (
+      <div className="mt-4 grid gap-2" data-testid="paywall-pillars">
+        {PILLARS.map((id, i) => {
+          const Icon = PILLAR_ICON[id];
+          const f = FEATURES[id];
+          return (
+            <div key={id} className={`flex gap-3 rounded-2xl px-4 py-3 ${feature === id ? 'bg-amber-50 ring-1 ring-amber-500/30' : 'bg-gray-50'}`}>
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-[#1d1608]" style={{ background: 'linear-gradient(135deg, #f3e3bd 0%, #d8b56e 55%, #b98f45 100%)' }}>
+                <Icon size={17} />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[14px] font-semibold leading-snug">
+                  {i + 1}. {f.title}
+                </span>
+                <span className="block text-[12px] leading-snug text-ink-muted">{f.text}</span>
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {focus && !isPrivate && !PILLARS.includes(feature) && (
         <div className="mt-3 rounded-2xl bg-amber-50 px-4 py-3 ring-1 ring-amber-500/25">
           <p className="text-[13px] font-semibold text-amber-800">{focus.title}</p>
           <p className="mt-0.5 text-[13px] leading-snug text-amber-700">{focus.text}</p>
@@ -160,13 +173,13 @@ export default function PaywallSheet({ open, feature, onClose }) {
       )}
 
       <div className="mt-6 overflow-hidden rounded-2xl ring-1 ring-hairline">
-        <div className="grid grid-cols-[1fr_76px_76px] bg-gray-50 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
+        <div className="grid grid-cols-[1fr_84px_84px] bg-gray-50 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
           <span>Возможности</span>
           <span className="text-center">Standard</span>
           <span className="text-center text-amber-700">Private</span>
         </div>
-        {ROWS.map(([label, free, pro]) => (
-          <div key={label} className="grid grid-cols-[1fr_76px_76px] items-center border-t border-hairline px-4 py-2.5 text-[13px]">
+        {COMPARISON.map(([label, free, pro]) => (
+          <div key={label} className="grid grid-cols-[1fr_84px_84px] items-center border-t border-hairline px-4 py-2.5 text-[13px]">
             <span className="pr-2 leading-snug text-ink-soft">{label}</span>
             <Cell value={free} />
             <Cell value={pro} gold />
@@ -190,5 +203,5 @@ export default function PaywallSheet({ open, feature, onClose }) {
 function Cell({ value, gold = false }) {
   if (value === true) return <Check size={16} strokeWidth={2.6} className={`mx-auto ${gold ? 'text-amber-600' : 'text-ink-soft'}`} aria-label="есть" />;
   if (value === false) return <Minus size={16} className="mx-auto text-gray-300" aria-label="нет" />;
-  return <span className={`tabular text-center font-semibold ${gold ? 'text-amber-700' : 'text-ink-soft'}`}>{value}</span>;
+  return <span className={`tabular text-center text-[12px] font-semibold leading-tight ${gold ? 'text-amber-700' : 'text-ink-soft'}`}>{value}</span>;
 }

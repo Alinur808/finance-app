@@ -308,3 +308,42 @@ input[type='range'] {
   .pressable,
   main { transition: none; }
 }
+
+/*
+ * Шторка приватности (utils/privacyCurtain.js): показывается синхронно,
+ * без анимации — снимок для переключателя приложений делается мгновенно.
+ * Всегда Obsidian, в любой теме: на снимке только знак ₸.
+ */
+#privacy-curtain {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  display: none;
+  place-items: center;
+  background: #050507;
+}
+html.privacy-curtain #privacy-curtain {
+  display: grid;
+}
+.privacy-curtain-mark {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+  background: #0e1015;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+  color: #f4f5f7;
+  font: 600 26px/1 'Inter Variable', -apple-system, system-ui, sans-serif;
+}
+
+/* Голосовой ввод: пульсирующее кольцо микрофона */
+@keyframes mic-pulse {
+  0% { box-shadow: 0 0 0 0 rgb(var(--red-500) / 0.45); }
+  70% { box-shadow: 0 0 0 14px rgb(var(--red-500) / 0); }
+  100% { box-shadow: 0 0 0 0 rgb(var(--red-500) / 0); }
+}
+.animate-mic { animation: mic-pulse 1.4s ease-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .animate-mic { animation: none; }
+}

@@ -1,11 +1,16 @@
 import { dayKey } from './dates.js';
+import { CATEGORIES } from '../data/categories.js';
+import { sanitizeGoals, sanitizePlan, sanitizeSettings, sanitizeText, sanitizeTransaction } from './sanitize.js';
+
+const knownCategory = (id) => Object.hasOwn(CATEGORIES, id);
+const MAX_IMPORT_BYTES = 25 * 1024 * 1024; // JSON больше 25 МБ — точно не копия этого приложения
 
 const APP_ID = 'tenge-finance';
 const VERSION = 1;
 
 /** Собирает резервную копию. Ключ ИИ намеренно не экспортируется. */
 export function buildBackup({ transactions, goals, settings, plan }) {
-  const { aiApiKey, ...safeSettings } = settings;
+  const { aiApiKey, ...safeSettings } = settings; // eslint-disable-line no-unused-vars
   return { app: APP_ID, version: VERSION, exportedAt: new Date().toISOString(), transactions, goals, settings: safeSettings, plan };
 }
 
@@ -46,6 +51,12 @@ const isTx = (t) =>
   typeof t.categoryId === 'string' &&
   !Number.isNaN(new Date(t.date).getTime());
 
+/** Операции из выписки: те же правила очистки, что и для JSON (названия продавцов из PDF — внешние данные). */
+export function sanitizeStatement(statement) {
+  const transactions = statement.transactions.map((t) => sanitizeTransaction(t, { knownCategory })).filter(Boolean);
+  return { ...statement, transactions, cardName: sanitizeText(statement.cardName, 40) };
+}
+
 const isPdf = async (file) => file.type === 'application/pdf' || /\.pdf$/i.test(file.name) || (await file.slice(0, 5).text()) === '%PDF-';
 
 /**
@@ -55,7 +66,7 @@ const isPdf = async (file) => file.type === 'application/pdf' || /\.pdf$/i.test(
 export async function readImportFile(file) {
   if (await isPdf(file)) {
     const { readStatementPdf } = await import('./pdfImport.js');
-    return { kind: 'statement', ...(await readStatementPdf(file)) };
+    return { kind: 'statement', ...sanitizeStatement(await readStatementPdf(file)) };
   }
   return { kind: 'backup', ...(await readBackup(file)) };
 }
@@ -63,6 +74,7 @@ export async function readImportFile(file) {
 /** Читает и проверяет файл. Бросает Error с понятным текстом на русском. */
 export async function readBackup(file) {
   let data;
+  if (file.size > MAX_IMPORT_BYTES) throw new Error('Файл слишком большой для резервной копии.');
   try {
     data = JSON.parse(await file.text());
   } catch {
@@ -72,12 +84,15 @@ export async function readBackup(file) {
   const bad = data.transactions.filter((t) => !isTx(t)).length;
   if (bad) throw new Error(`В файле ${bad} повреждённых операций — импорт отменён.`);
   if (data.goals && !Array.isArray(data.goals)) throw new Error('Раздел целей в файле повреждён.');
-  const planOk = data.plan && typeof data.plan.deadline === 'string' && Array.isArray(data.plan.items) && Array.isArray(data.plan.incomes);
+  // только известные поля и чистые строки (utils/sanitize.js)
+  const transactions = data.transactions.map((t) => sanitizeTransaction(t, { knownCategory }));
+  const broken = transactions.filter((t) => !t).length;
+  if (broken) throw new Error(`В файле ${broken} повреждённых операций — импорт отменён.`);
   return {
-    transactions: data.transactions.map((t) => ({ note: '', accountId: 'kaspi', ...t })),
-    goals: data.goals,
-    settings: data.settings,
-    plan: planOk ? data.plan : undefined, // старые копии без дневника — оставляем текущий план
-    exportedAt: data.exportedAt,
+    transactions,
+    goals: sanitizeGoals(data.goals),
+    settings: sanitizeSettings(data.settings),
+    plan: sanitizePlan(data.plan), // старые копии без дневника — оставляем текущий план
+    exportedAt: typeof data.exportedAt === 'string' ? data.exportedAt.slice(0, 40) : undefined,
   };
 }

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
   ChevronRight,
+  Clock3,
   Crown,
   Download,
   Eye,
@@ -16,6 +17,7 @@ import {
   ShieldCheck,
   Smartphone,
   Sparkles,
+  CalendarRange,
   Sun,
   UserRound,
   Vibrate,
@@ -39,6 +41,9 @@ import { downloadBackup } from '../utils/backup.js';
 import { amountToNumber, displayAmount, numberToRaw, sanitizeAmount } from '../utils/amountInput.js';
 import { formatMoney, MONEY_MASK, plural } from '../utils/format.js';
 import { Card, ScreenHeader, SectionHeader, Segmented, Toggle } from '../components/ui.jsx';
+import ShortcutsCard from '../components/profile/ShortcutsCard.jsx';
+import { useAiKey } from '../utils/secrets.js';
+import { estimateHourlyRate } from '../utils/worthIt.js';
 
 const TX_WORDS = ['операция', 'операции', 'операций'];
 const row = 'flex items-center gap-3 px-4 py-3.5';
@@ -51,13 +56,15 @@ const PrivateBadge = () => (
 
 export default function Profile({ toast }) {
   const state = useFinance();
-  const { transactions, settings, updateSettings, setAccountBalance, resetAll, goals } = state;
+  const { transactions, settings, updateSettings, setAccountBalance, resetAll, goals, encrypted } = state;
+  const [aiKey, setAiKey] = useAiKey();
+  const autoRate = useMemo(() => estimateHourlyRate(transactions), [transactions]);
   const { accounts } = useAccounts();
   const balances = useMemo(() => accountBalances(transactions, ACCOUNTS, settings.openings), [transactions, settings.openings]);
   const backupImport = useBackupImport({ toast });
 
   const [editBalance, setEditBalance] = useState(null); // { accountId, raw }
-  const [aiOpen, setAiOpen] = useState(Boolean(settings.aiApiKey));
+  const [aiOpen, setAiOpen] = useState(Boolean(aiKey));
   const [showKey, setShowKey] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [passcodeMode, setPasscodeMode] = useState(null); // null | 'create' | 'disable'
@@ -206,7 +213,7 @@ export default function Profile({ toast }) {
               <span className="min-w-0 flex-1">
                 <span className="block text-[15px] font-semibold">Private Membership</span>
                 <span className="block text-[13px] text-ink-muted">
-                  {membership.isPrivate ? 'Активен · все возможности открыты' : 'Стратег без лимитов, история выписок, код-пароль'}
+                  {membership.isPrivate ? 'Активен · все возможности открыты' : 'Портрет привычек, «Стоит ли оно того?», ИИ-аналитик'}
                 </span>
               </span>
               <ChevronRight size={18} className="shrink-0 text-gray-300" />
@@ -227,6 +234,11 @@ export default function Profile({ toast }) {
               </div>
             )}
           </Card>
+        </section>
+
+        <section>
+          <SectionHeader title="Автоматизация" />
+          <ShortcutsCard toast={toast} />
         </section>
 
         <section>
@@ -278,26 +290,31 @@ export default function Profile({ toast }) {
             <div className={row}>
               <Lock size={20} className="shrink-0 text-ink-soft" />
               <span className="min-w-0 flex-1">
-                <span className="block text-[15px] font-medium">
-                  Защита код-паролем
-                  {!membership.isPrivate && !security.enabled && <PrivateBadge />}
-                </span>
+                <span className="block text-[15px] font-medium">Защита код-паролем</span>
                 <span className="block text-[12px] text-ink-muted">При запуске и возврате в приложение</span>
               </span>
               <Toggle
                 on={security.enabled}
                 label="Защита код-паролем"
-                onChange={(on) => {
-                  if (on && !membership.require('passcode')) return;
-                  setPasscodeMode(on ? 'create' : 'disable');
-                }}
+                onChange={(on) => setPasscodeMode(on ? 'create' : 'disable')}
               />
             </div>
             {security.enabled && security.canBiometric && (
               <div className={row}>
                 <ScanFace size={20} className="shrink-0 text-ink-soft" />
-                <span className="flex-1 text-[15px] font-medium">Face ID / Touch ID</span>
-                <Toggle on={security.biometricsEnabled} onChange={security.setBiometrics} label="Face ID" />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[15px] font-medium">Face ID / Touch ID</span>
+                  <span className="block text-[12px] text-ink-muted">{security.biometricKind === 'webauthn' ? 'Прямо в браузере, код-пароль — запасной' : 'Вместо ввода кода'}</span>
+                </span>
+                <Toggle
+                  on={security.biometricsEnabled}
+                  label="Face ID"
+                  onChange={async (on) => {
+                    const result = await security.setBiometrics(on);
+                    if (!result.ok) toast(result.error);
+                    else if (on) toast('Face ID включён');
+                  }}
+                />
               </div>
             )}
             <div className={row}>
@@ -315,7 +332,10 @@ export default function Profile({ toast }) {
           </Card>
           <p className="mt-2 flex gap-2 px-1 text-[12px] leading-snug text-ink-muted">
             <Smartphone size={14} className="mt-0.5 shrink-0" />
-            Код-пароль хранится на устройстве в виде хеша и не попадает в резервную копию.
+            <span>
+              {encrypted ? 'Данные зашифрованы на устройстве (AES-256). ' : ''}Код-пароль хранится в виде хеша, Face ID — в защищённом модуле телефона; ни то ни другое не попадает в
+              резервную копию. В переключателе приложений суммы закрыты шторкой.
+            </span>
           </p>
         </section>
 
@@ -337,13 +357,46 @@ export default function Profile({ toast }) {
                 <span className="text-ink-muted">₸</span>
               </span>
             </label>
+            <label htmlFor="weekly-limit-setting" className={row}>
+              <CalendarRange size={20} className="shrink-0 text-ink-soft" />
+              <span className="flex-1 text-[15px] font-medium">Недельный лимит трат</span>
+              <span className="flex items-center gap-1">
+                <input
+                  id="weekly-limit-setting"
+                  inputMode="numeric"
+                  value={settings.weeklyLimit ? displayAmount(String(settings.weeklyLimit)) : ''}
+                  placeholder="выключен"
+                  onChange={(e) => updateSettings({ weeklyLimit: Math.floor(amountToNumber(sanitizeAmount(e.target.value.split(',')[0]))) })}
+                  className={`${fieldCls} w-32`}
+                />
+                <span className="text-ink-muted">₸</span>
+              </span>
+            </label>
+            <label htmlFor="hourly-rate-setting" className={row}>
+              <Clock3 size={20} className="shrink-0 text-ink-soft" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-[15px] font-medium">Мой час работы</span>
+                <span className="block text-[12px] text-ink-muted">Для «Стоит ли оно того?»</span>
+              </span>
+              <span className="flex items-center gap-1">
+                <input
+                  id="hourly-rate-setting"
+                  inputMode="numeric"
+                  value={settings.hourlyRate ? displayAmount(String(settings.hourlyRate)) : ''}
+                  placeholder={autoRate.rate > 0 && !hidden ? `авто ${displayAmount(String(Math.round(autoRate.rate)))}` : 'авто'}
+                  onChange={(e) => updateSettings({ hourlyRate: Math.floor(amountToNumber(sanitizeAmount(e.target.value.split(',')[0]))) })}
+                  className={`${fieldCls} w-32`}
+                />
+                <span className="text-ink-muted">₸</span>
+              </span>
+            </label>
             <button onClick={() => setAiOpen((v) => !v)} className={`${row} w-full text-left active:bg-gray-50`} aria-expanded={aiOpen}>
               <Sparkles size={20} className="shrink-0 text-ink-soft" />
               <span className="flex-1 text-[15px] font-medium">
                 ИИ-разбор капитала{' '}
                 {membership.isPrivate ? <span className="ml-1 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-ink-muted">бета</span> : <PrivateBadge />}
               </span>
-              <span className="text-[13px] text-ink-muted">{settings.aiApiKey ? 'включён' : 'выключен'}</span>
+              <span className="text-[13px] text-ink-muted">{aiKey ? 'включён' : 'выключен'}</span>
               <ChevronRight size={18} className={`shrink-0 text-gray-300 transition-transform ${aiOpen ? 'rotate-90' : ''}`} />
             </button>
             {aiOpen && (
@@ -357,10 +410,11 @@ export default function Profile({ toast }) {
                     type={showKey ? 'text' : 'password'}
                     autoComplete="off"
                     spellCheck={false}
-                    value={settings.aiApiKey}
+                    value={aiKey}
                     onChange={(e) => {
                       const key = e.target.value.trim();
-                      updateSettings({ aiApiKey: key, ...(key ? { aiProvider: detectProvider(key) } : {}) });
+                      setAiKey(key);
+                      if (key) updateSettings({ aiProvider: detectProvider(key) });
                     }}
                     placeholder="sk-ant-…"
                     className="min-w-0 flex-1 bg-transparent font-mono text-base outline-none placeholder:font-sans placeholder:text-ink-muted"
@@ -369,12 +423,16 @@ export default function Profile({ toast }) {
                     {showKey ? 'Скрыть' : 'Показать'}
                   </button>
                 </div>
-                {settings.aiApiKey && settings.aiProvider !== 'anthropic' && (
+                {aiKey && settings.aiProvider !== 'anthropic' && (
                   <p className="text-[12px] text-amber-700">{AI_PROVIDERS[settings.aiProvider]?.label ?? 'Этот провайдер'} пока не подключён — нужен ключ Anthropic.</p>
                 )}
                 <p className="flex gap-2 text-[12px] leading-snug text-ink-muted">
-                  <ShieldAlert size={15} className="mt-0.5 shrink-0" />С ключом на вкладке «Планы» появится «Совет от ИИ»: он отправит операции за 60 дней выбранному провайдеру.
-                  Ключ хранится только на этом устройстве и не попадает в экспорт.
+                  <ShieldAlert size={15} className="mt-0.5 shrink-0" />
+                  <span>
+                    С ключом в «Планы → Анализ и профиль» появится «ИИ-разбор»: он отправит операции за 60 дней выбранному провайдеру.{' '}
+                    <b className="font-semibold text-ink-soft">Ключ живёт только до закрытия приложения</b> — отдельно от финансовых данных, не сохраняется на устройстве и не попадает в
+                    экспорт. При следующем запуске вставьте его снова.
+                  </span>
                 </p>
               </div>
             )}

@@ -1,16 +1,23 @@
 import { useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext.jsx';
+import { ACCOUNTS } from '../data/accounts.js';
 import { buildAdvice } from '../utils/advisor.js';
+import { accountBalances } from '../utils/analytics.js';
+import { buildSafeToSpend } from '../utils/pace.js';
 import { usePrivacy } from '../hooks/usePrivacy.js';
 import { formatMoney, formatPercent } from '../utils/format.js';
 import AdvisorPanel from '../components/goals/AdvisorPanel.jsx';
+import CapitalCurrencies from '../components/goals/CapitalCurrencies.jsx';
 import ContributeSheet from '../components/goals/ContributeSheet.jsx';
 import GoalFormSheet from '../components/goals/GoalFormSheet.jsx';
-import GoalHero from '../components/goals/GoalHero.jsx';
+import PaceHero from '../components/goals/PaceHero.jsx';
 import WealthTelemetry from '../components/goals/WealthTelemetry.jsx';
+import WorthItSheet from '../components/goals/WorthItSheet.jsx';
 import FinancialDiary from '../components/diary/FinancialDiary.jsx';
-import { ScreenHeader, Segmented } from '../components/ui.jsx';
+import BehaviorPortrait from '../components/profile/BehaviorPortrait.jsx';
+import WeeklyCard from '../components/weekly/WeeklyCard.jsx';
+import { Card, ScreenHeader, Segmented } from '../components/ui.jsx';
 
 const TEMPLATES = [
   { emoji: '🛟', name: 'Подушка безопасности', target: 300000, hint: '3 месяца спокойствия' },
@@ -18,13 +25,23 @@ const TEMPLATES = [
   { emoji: '💻', name: 'Крупная покупка', target: 400000, hint: 'Техника, мебель' },
 ];
 
-/** Цели (накопления + советник) и Финансовый дневник (план трат до даты). */
-export default function Goals({ now, toast, section = 'goals', onSection }) {
-  const { goals, activeGoalId, setActiveGoal, saveGoal, deleteGoal, contribute, transactions } = useFinance();
+/**
+ * «Планы» — два раздела вместо двух длинных списков:
+ *   «Цель и дневник»   — герой «Цель и темп трат» (прогресс цели, «Сегодня можно потратить»,
+ *                         прогноз даты, статус), неделя и лимит, «Финансовый дневник»;
+ *   «Анализ и профиль» — поведенческий портрет, главные цифры, стратег, капитал в валютах.
+ * Старые адреса раздела ('goals', 'diary') ведут в «Цель и дневник».
+ */
+export default function Goals({ now, toast, section = 'cockpit', onSection }) {
+  const view = section === 'insights' ? 'insights' : 'cockpit';
+  const { goals, activeGoalId, setActiveGoal, saveGoal, deleteGoal, contribute, transactions, settings, plan } = useFinance();
   const [form, setForm] = useState(null); // null | { goal } | { template }
   const [contributing, setContributing] = useState(false);
+  const [worthOpen, setWorthOpen] = useState(false);
   const goal = goals.find((g) => g.id === activeGoalId) ?? goals[0];
   const advice = useMemo(() => (goal ? buildAdvice(transactions, goal, now) : null), [transactions, goal, now]);
+  const balance = useMemo(() => Object.values(accountBalances(transactions, ACCOUNTS, settings.openings)).reduce((a, b) => a + b, 0), [transactions, settings.openings]);
+  const pace = useMemo(() => buildSafeToSpend({ transactions, balance, plan, advice, now }), [transactions, balance, plan, advice, now]);
   const { money } = usePrivacy();
 
   return (
@@ -32,7 +49,7 @@ export default function Goals({ now, toast, section = 'goals', onSection }) {
       <ScreenHeader
         title="Планы"
         right={
-          section === 'goals' && goals.length > 0 ? (
+          view === 'cockpit' && goals.length > 0 ? (
             <button onClick={() => setForm({})} className="pressable flex h-10 shrink-0 items-center gap-1 rounded-full bg-ink px-4 text-sm font-semibold text-on-ink">
               <Plus size={16} strokeWidth={2.6} /> Цель
             </button>
@@ -41,67 +58,76 @@ export default function Goals({ now, toast, section = 'goals', onSection }) {
       />
       <Segmented
         className="mx-5"
-        value={section}
+        value={view}
         onChange={onSection}
         items={[
-          ['goals', 'Цели'],
-          ['diary', 'Дневник'],
+          ['cockpit', 'Цель и дневник'],
+          ['insights', 'Анализ и профиль'],
         ]}
       />
 
-      <div className="mt-5 space-y-5 px-5">
-        {section === 'goals' && <WealthTelemetry now={now} />}
-        {section === 'diary' ? (
-          <FinancialDiary now={now} toast={toast} />
-        ) : !goal ? (
-          <div className="space-y-3">
-            <div className="rounded-3xl bg-surface p-5 shadow-card">
-              <p className="text-[17px] font-semibold">На что копим?</p>
-              <p className="mt-1 text-sm leading-snug text-ink-muted">Поставьте цель — стратег сравнит её с вашими тратами и покажет самый быстрый путь.</p>
-            </div>
-            {TEMPLATES.map((t) => (
-              <button key={t.name} onClick={() => setForm({ template: t })} className="pressable flex w-full items-center gap-3 rounded-3xl bg-surface p-4 text-left shadow-card">
-                <span className="grid h-11 w-11 place-items-center rounded-2xl bg-gray-50 text-2xl">{t.emoji}</span>
-                <span className="min-w-0 flex-1">
-                  <span className="block font-semibold">{t.name}</span>
-                  <span className="block text-[13px] text-ink-muted">{t.hint}</span>
-                </span>
-                <span className="tabular text-sm font-semibold text-ink-soft">{formatMoney(t.target, { compact: true })}</span>
-              </button>
-            ))}
-            <button onClick={() => setForm({})} className="pressable h-12 w-full rounded-2xl text-[15px] font-semibold text-brand-700">
-              Своя цель
-            </button>
-          </div>
-        ) : (
+      <div className="mt-5 space-y-4 px-5">
+        {view === 'cockpit' ? (
           <>
             {goals.length > 1 && (
-              <div className="no-scrollbar -mx-5 flex gap-2.5 overflow-x-auto px-5 py-1">
+              <div className="no-scrollbar -mx-5 flex gap-2 overflow-x-auto px-5 py-1">
                 {goals.map((g) => {
                   const on = g.id === goal.id;
-                  const pct = g.saved / g.target;
                   return (
                     <button
                       key={g.id}
                       onClick={() => setActiveGoal(g.id)}
-                      className={`pressable w-40 shrink-0 rounded-2xl p-3 text-left ${on ? 'bg-surface shadow-card ring-2 ring-brand-500' : 'bg-surface/60 shadow-card'}`}
+                      className={`pressable flex h-10 shrink-0 items-center gap-2 rounded-full px-3.5 text-[13px] font-semibold ${on ? 'bg-ink text-on-ink' : 'bg-surface text-ink-soft shadow-card'}`}
+                      aria-pressed={on}
                     >
-                      <p className="truncate text-sm font-semibold">
-                        {g.emoji} {g.name}
-                      </p>
-                      <p className="mt-0.5 text-[12px] text-ink-muted">
-                        {money(g.saved, { compact: true })} из {money(g.target, { compact: true })}
-                      </p>
-                      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-100">
-                        <div className="h-full rounded-full bg-brand-500" style={{ width: formatPercent(Math.min(1, pct)) }} />
-                      </div>
+                      {g.emoji} <span className="max-w-[120px] truncate">{g.name}</span>
+                      <span className="tabular opacity-70">{formatPercent(Math.min(1, g.saved / g.target))}</span>
                     </button>
                   );
                 })}
               </div>
             )}
-            <GoalHero goal={goal} onContribute={() => setContributing(true)} onEdit={() => setForm({ goal })} />
-            {advice && <AdvisorPanel advice={advice} goal={goal} />}
+
+            <PaceHero
+              goal={goal}
+              advice={advice}
+              pace={pace}
+              onContribute={() => setContributing(true)}
+              onEdit={() => setForm({ goal })}
+              onCreateGoal={() => setForm({})}
+              onWorthIt={() => setWorthOpen(true)}
+            />
+
+            {!goal && (
+              <div className="no-scrollbar -mx-5 flex gap-2.5 overflow-x-auto px-5 py-1" aria-label="Готовые цели">
+                {TEMPLATES.map((t) => (
+                  <button key={t.name} onClick={() => setForm({ template: t })} className="pressable w-44 shrink-0 rounded-2xl bg-surface p-3 text-left shadow-card">
+                    <span className="text-xl">{t.emoji}</span>
+                    <span className="mt-1 block truncate text-[14px] font-semibold">{t.name}</span>
+                    <span className="block truncate text-[12px] text-ink-muted">
+                      {t.hint} · {money(t.target, { compact: true })}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <WeeklyCard now={now} />
+            <FinancialDiary now={now} toast={toast} compact />
+          </>
+        ) : (
+          <>
+            <BehaviorPortrait now={now} />
+            <WealthTelemetry now={now} />
+            {goal && advice ? (
+              <AdvisorPanel advice={advice} goal={goal} now={now} />
+            ) : (
+              <Card className="p-4">
+                <p className="text-[15px] font-semibold">Стратег ждёт цель</p>
+                <p className="mt-1 text-[13px] leading-snug text-ink-muted">Поставьте цель во вкладке «Цель и дневник» — стратег сравнит её с вашими тратами и покажет самый быстрый путь.</p>
+              </Card>
+            )}
+            <CapitalCurrencies />
           </>
         )}
       </div>
@@ -122,16 +148,19 @@ export default function Goals({ now, toast, section = 'goals', onSection }) {
           toast('Цель удалена');
         }}
       />
-      <ContributeSheet
-        open={contributing}
-        goal={goal}
-        onClose={() => setContributing(false)}
-        onConfirm={(amount) => {
-          contribute(goal.id, amount);
-          setContributing(false);
-          toast(`${formatMoney(amount)} отложено на «${goal.name}»`); // App маскирует суммы в Stealth Mode
-        }}
-      />
+      {goal && (
+        <ContributeSheet
+          open={contributing}
+          goal={goal}
+          onClose={() => setContributing(false)}
+          onConfirm={(amount) => {
+            contribute(goal.id, amount);
+            setContributing(false);
+            toast(`${formatMoney(amount)} отложено на «${goal.name}»`); // App маскирует суммы в Stealth Mode
+          }}
+        />
+      )}
+      <WorthItSheet open={worthOpen} onClose={() => setWorthOpen(false)} goal={goal ?? null} advice={advice} />
     </div>
   );
 }

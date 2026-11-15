@@ -14,6 +14,23 @@ import { useSecurity } from './context/SecurityContext.jsx';
 import { usePrivacy } from './hooks/usePrivacy.js';
 import { formatMoney } from './utils/format.js';
 import { haptic } from './utils/haptics.js';
+import { parseQuickAdd, stripQuickAddParams } from './utils/sanitize.js';
+import { CATEGORIES } from './data/categories.js';
+import VaultNotice from './components/security/VaultNotice.jsx';
+
+// категории, которые можно передать в ссылке быстрого ввода (?category=…)
+const quickAddCategory = (id, type) => Object.hasOwn(CATEGORIES, id) && !CATEGORIES[id].system && CATEGORIES[id].type === type;
+
+/** Черновик из ссылки Команд iOS. Параметры сразу убираются из адреса — обновление страницы не откроет лист снова. */
+function readQuickAdd() {
+  if (typeof window === 'undefined') return null;
+  const draft = parseQuickAdd(window.location.search, { knownCategory: quickAddCategory });
+  if (draft) {
+    const clean = stripQuickAddParams(window.location.href);
+    if (clean) window.history.replaceState(window.history.state, '', clean);
+  }
+  return draft;
+}
 
 export default function App() {
   const { transactions, addTransaction, updateTransaction, deleteTransaction, setFilters, settings } = useFinance();
@@ -21,8 +38,11 @@ export default function App() {
   const { locked } = useSecurity();
   const privacy = usePrivacy();
   const [tab, setTab] = useState('overview');
-  const [goalsSection, setGoalsSection] = useState('goals');
-  const [adding, setAdding] = useState(false);
+  const [goalsSection, setGoalsSection] = useState('cockpit');
+  // ?quickAdd=1&amount=…&merchant=… (Команды iOS / Apple Pay) → лист с черновиком, без автосохранения
+  const [quickDraft] = useState(readQuickAdd);
+  const [draft, setDraft] = useState(quickDraft);
+  const [adding, setAdding] = useState(Boolean(quickDraft));
   const [selectedId, setSelectedId] = useState(null);
   const [message, setMessage] = useState(null);
   // в Stealth Mode суммы не появляются даже во всплывающих сообщениях
@@ -69,21 +89,36 @@ export default function App() {
         paddingBottom: firstRun ? 0 : 'calc(96px + env(safe-area-inset-bottom))',
       }}
     >
+      <VaultNotice />
       {/* заблокировано — содержимое остаётся в памяти, но скрыто и недоступно */}
       <div aria-hidden={locked || undefined} style={locked ? { visibility: 'hidden' } : undefined}>
         <main key={tab} className="animate-fade-in">
           {screens[firstRun ? 'overview' : tab]}
         </main>
 
-        {!firstRun && <BottomNav active={tab} onChange={navigate} onAdd={() => setAdding(true)} />}
+        {!firstRun && (
+          <BottomNav
+            active={tab}
+            onChange={navigate}
+            onAdd={() => {
+              setDraft(null);
+              setAdding(true);
+            }}
+          />
+        )}
 
         <AddTransactionSheet
-          open={adding}
-          onClose={() => setAdding(false)}
+          open={adding && !locked}
+          draft={draft}
+          onClose={() => {
+            setAdding(false);
+            setDraft(null);
+          }}
           onSave={(tx) => {
             addTransaction(tx);
             haptic('success');
             setAdding(false);
+            setDraft(null);
             toast(`${tx.type === 'income' ? 'Доход' : 'Расход'} ${formatMoney(tx.amount)} добавлен`);
           }}
         />

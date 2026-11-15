@@ -5,13 +5,15 @@ import { haptic } from '../utils/haptics.js';
 import PaywallSheet from '../components/membership/PaywallSheet.jsx';
 import { STANDARD_LIMITS, TIERS } from '../data/membership.js';
 
-export { FEATURES, STANDARD_LIMITS, TIERS } from '../data/membership.js';
+export { COMPARISON, FEATURES, PILLARS, STANDARD_LIMITS, TIERS } from '../data/membership.js';
 
 /**
  * Тарифы приложения.
- *   Standard (бесплатно) — ручной учёт, первая выписка, аналитика, Stealth Mode.
- *   Private (Membership) — стратег без ограничений и ИИ-разбор, история выписок
- *   за много периодов, безлимитные цели дневника, код-пароль.
+ *   Standard (бесплатно) — безлимитный ручной учёт, PDF-выписки всех банков,
+ *   категории с долями, «сегодня можно потратить», итоги недели, код-пароль и Face ID.
+ *   Private (Membership) — четыре столпа (data/membership.js → PILLARS):
+ *   поведенческий портрет, симулятор «Стоит ли оно того?» с прогнозом целей,
+ *   безлимитный ИИ-аналитик и голосовой ввод, мультивалютный капитал и архив выписок.
  *
  * Состояние — отдельный ключ tenge-finance.membership (не в резервной копии:
  * покупка привязана к Apple ID / Google-аккаунту, а не к файлу данных).
@@ -20,7 +22,7 @@ export { FEATURES, STANDARD_LIMITS, TIERS } from '../data/membership.js';
  */
 const KEY = 'tenge-finance.membership';
 
-const UNLIMITED = { insights: Infinity, diaryItems: Infinity };
+const UNLIMITED = { insights: Infinity, diaryItems: Infinity, voicePerDay: Infinity };
 
 const DEFAULT_STATE = { tier: 'standard', source: 'default', plan: null, since: null };
 const SubscriptionContext = createContext(null);
@@ -56,7 +58,7 @@ export function SubscriptionProvider({ children }) {
   }, []);
   const closePaywall = useCallback(() => setPaywall(null), []);
 
-  /** true — можно; false — открыт пейвол. Для кнопок: `if (!require('passcode')) return;` */
+  /** true — можно; false — открыт пейвол. Для кнопок: `if (!require('worthIt')) return;` */
   const require = useCallback(
     (feature) => {
       if (isPrivate) return true;

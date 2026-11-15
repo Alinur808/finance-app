@@ -20,9 +20,12 @@ const pct = (part, whole) => `${whole > 0 ? Math.max(0, Math.min(100, (part / wh
 /**
  * «Финансовый дневник»: успеваю ли я собрать деньги на цели к дедлайну
  * и сколько можно тратить сегодня. Баланс берётся из текущего состояния
- * (все счета), план — из state.plan (сохраняется в localStorage и в экспорт).
+ * (все счета), план — из state.plan (сохраняется в зашифрованном сейфе и в экспорт).
+ *
+ * compact — внутри «Цель и темп трат»: главная цифра и «сегодня» уже показаны
+ * в герое, здесь — только капитал к дедлайну, цели-покупки и поступления.
  */
-export default function FinancialDiary({ now, toast }) {
+export default function FinancialDiary({ now, toast, compact = false }) {
   const { transactions, settings, plan, togglePlanItemPaid, savePlan } = useFinance();
   const [editing, setEditing] = useState(false);
 
@@ -51,13 +54,14 @@ export default function FinancialDiary({ now, toast }) {
   // План ещё не задан — объясняем, что делает дневник, вместо таблицы нулей.
   if (!plan.items.length && !plan.incomes.length) {
     return (
-      <Card className="p-5">
+      <Card className={compact ? 'p-4' : 'p-5'}>
         <Header subtitle="План трат до выбранной даты" onEdit={() => setEditing(true)} />
-        <p className="mt-4 text-[15px] leading-relaxed text-ink-soft">
-          Впереди крупные траты — например, подарки, поездка или техника? Укажите их, дату и ожидаемые поступления, и дневник каждый день будет показывать, сколько можно спокойно
-          потратить, чтобы на всё хватило.
+        <p className={`${compact ? 'mt-2.5 text-[13px]' : 'mt-4 text-[15px]'} leading-relaxed text-ink-soft`}>
+          {compact
+            ? 'Впереди подарки, поездка или техника? Внесите их и ожидаемые поступления — «Сегодня можно потратить» будет учитывать и их.'
+            : 'Впереди крупные траты — например, подарки, поездка или техника? Укажите их, дату и ожидаемые поступления, и дневник каждый день будет показывать, сколько можно спокойно потратить, чтобы на всё хватило.'}
         </p>
-        <button onClick={() => setEditing(true)} className="pressable mt-4 h-12 w-full rounded-2xl bg-ink text-[15px] font-semibold text-on-ink">
+        <button onClick={() => setEditing(true)} className={`pressable ${compact ? 'mt-3 h-11 bg-gray-100 text-ink' : 'mt-4 h-12 bg-ink text-on-ink'} w-full rounded-2xl text-[15px] font-semibold`}>
           Составить план
         </button>
         {editor}
@@ -86,8 +90,8 @@ export default function FinancialDiary({ now, toast }) {
       <div className="p-4 pb-3">
         <Header subtitle={`До ${formatFullDate(f.deadline)} · ${f.daysLeft === 0 ? 'сегодня' : `осталось ${plural(f.daysLeft, DAYS)}`}`} onEdit={() => setEditing(true)} />
 
-        {/* Главная цифра: свободные деньги */}
-        <div className={`mt-4 rounded-2xl p-3.5 ${f.safe >= 0 ? 'bg-brand-50' : 'bg-red-50'}`}>
+        {/* Главная цифра: свободные деньги (в компактном виде — в герое «Цель и темп трат») */}
+        {!compact && <div className={`mt-4 rounded-2xl p-3.5 ${f.safe >= 0 ? 'bg-brand-50' : 'bg-red-50'}`}>
           <p className={`text-[13px] font-medium ${f.safe >= 0 ? 'text-brand-800' : 'text-red-800'}`}>{f.safe >= 0 ? 'Можно тратить до дедлайна' : 'Не хватает до целей'}</p>
           <p className={`tabular text-[28px] font-extrabold leading-tight tracking-tight ${f.safe >= 0 ? 'text-brand-700' : 'text-red-700'}`}>
             {f.safe >= 0 ? show(f.safe) : show(Math.ceil(-f.safe))}
@@ -97,10 +101,10 @@ export default function FinancialDiary({ now, toast }) {
               ? `≈ ${show(f.dailyLimit)} в день на еду, транспорт и прочее`
               : `Нужно сократить траты или отложить одну из целей — иначе к ${formatShortDate(f.deadline).toLowerCase()} денег не хватит`}
           </p>
-        </div>
+        </div>}
 
         {/* Сегодня */}
-        {f.safe >= 0 && (
+        {!compact && f.safe >= 0 && (
           <div className="mt-3">
             <div className="flex items-baseline justify-between text-[13px]">
               <span className="font-semibold text-ink-soft">Сегодня потрачено</span>

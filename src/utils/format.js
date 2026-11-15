@@ -27,6 +27,16 @@ const trim = (n, digits) => clean(Number(n.toFixed(digits)).toLocaleString('ru-R
 
 export const formatPercent = (ratio, digits = 0) => `${(ratio * 100).toFixed(digits).replace('.', ',')}%`;
 
+/**
+ * Доля категории: до 10% — с одним знаком после запятой («4,5%»), чтобы мелкие
+ * категории не сливались в «0%»; меньше 0,1% — «<0,1%».
+ */
+export function formatShare(ratio) {
+  if (!(ratio > 0)) return '0%';
+  if (ratio < 0.001) return '<0,1%';
+  return formatPercent(ratio, ratio < 0.1 ? 1 : 0);
+}
+
 /** Сумма операции со знаком, как в списке. */
 export const formatTxAmount = (tx) => formatMoney(tx.type === 'expense' ? -tx.amount : tx.amount, { sign: true });
 

@@ -2,6 +2,7 @@ import { addDays, DAY_MS, formatFullDate, startOfDay } from './dates.js';
 import { formatMoney, formatPercent, groupDigits, plural } from './format.js';
 import { spendingByCategory, totals } from './analytics.js';
 import { getCategory } from '../data/categories.js';
+import { analyzeBehavior, personaSummary } from './userProfileAnalyzer.js';
 
 /** Расчётные суммы показываем без тиынов. */
 const money = (v, opts = {}) => formatMoney(v, { decimals: false, ...opts });
@@ -200,6 +201,96 @@ export function buildAdvice(transactions, goal, now = new Date()) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Месяц к месяцу и аномалии                                           */
+/* ------------------------------------------------------------------ */
+
+const NOT_SPENDING = new Set(['own', 'fx']);
+
+/**
+ * Расходы по категориям: этот месяц (с 1-го по сегодня) против тех же дней
+ * прошлого месяца. Сравнение честное: одинаковое число дней.
+ * → { comparable, current, previous, change, categories: [{ id, name, current, previous, delta, change }] }
+ */
+export function monthOverMonth(transactions, now = new Date()) {
+  const today = startOfDay(now);
+  const curStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const prevStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+  const prevLastDay = new Date(today.getFullYear(), today.getMonth(), 0).getDate();
+  const prevEnd = new Date(today.getFullYear(), today.getMonth() - 1, Math.min(today.getDate(), prevLastDay), 23, 59, 59, 999);
+  const earliest = transactions.reduce((m, t) => Math.min(m, new Date(t.date).getTime()), Infinity);
+  const cur = new Map();
+  const prev = new Map();
+  for (const t of transactions) {
+    if (t.type !== 'expense' || NOT_SPENDING.has(t.categoryId)) continue;
+    const d = new Date(t.date);
+    if (d >= curStart && d <= now) cur.set(t.categoryId, (cur.get(t.categoryId) ?? 0) + t.amount);
+    else if (d >= prevStart && d <= prevEnd) prev.set(t.categoryId, (prev.get(t.categoryId) ?? 0) + t.amount);
+  }
+  const ids = new Set([...cur.keys(), ...prev.keys()]);
+  const categories = [...ids]
+    .map((id) => {
+      const c = cur.get(id) ?? 0;
+      const p = prev.get(id) ?? 0;
+      return { id, name: getCategory(id).name, current: c, previous: p, delta: c - p, change: p > 0 ? (c - p) / p : null };
+    })
+    .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+  const current = [...cur.values()].reduce((a, b) => a + b, 0);
+  const previous = [...prev.values()].reduce((a, b) => a + b, 0);
+  return { comparable: earliest <= prevStart.getTime() && previous > 0, current, previous, change: previous > 0 ? (current - previous) / previous : null, categories };
+}
+
+/**
+ * Необычные операции за последние 30 дней: сумма намного больше обычной для
+ * этой категории (медиана × 3 и минимум 10 000 ₸), при истории ≥ 4 операций.
+ * → [{ id, date, merchant, categoryId, amount, typical, ratio }]
+ */
+export function detectAnomalies(transactions, now = new Date(), { days = 30, minAmount = 10000 } = {}) {
+  const since = addDays(startOfDay(now), -(days - 1));
+  const byCat = new Map();
+  for (const t of transactions) {
+    if (t.type !== 'expense' || NOT_SPENDING.has(t.categoryId) || t.categoryId === 'transfers') continue;
+    if (!byCat.has(t.categoryId)) byCat.set(t.categoryId, []);
+    byCat.get(t.categoryId).push(t.amount);
+  }
+  const typical = new Map();
+  for (const [id, xs] of byCat) {
+    if (xs.length < 4) continue;
+    const s = [...xs].sort((a, b) => a - b);
+    typical.set(id, s[Math.floor(s.length / 2)]);
+  }
+  return transactions
+    .filter((t) => {
+      const d = new Date(t.date);
+      const med = typical.get(t.categoryId);
+      return t.type === 'expense' && d >= since && d <= now && med && t.amount >= minAmount && t.amount >= med * 3;
+    })
+    .map((t) => ({ id: t.id, date: t.date, merchant: t.merchant, categoryId: t.categoryId, amount: t.amount, typical: typical.get(t.categoryId), ratio: t.amount / typical.get(t.categoryId) }))
+    .sort((a, b) => b.ratio - a.ratio)
+    .slice(0, 5);
+}
+
+/** Короткие выводы «что изменилось» простым языком (для карточки и ИИ). */
+export function describeChanges(mom, anomalies) {
+  const lines = [];
+  if (mom.comparable && mom.change != null) {
+    lines.push(
+      Math.abs(mom.change) < 0.05
+        ? 'Тратите примерно столько же, сколько в прошлом месяце за те же дни.'
+        : `Расходы ${mom.change > 0 ? 'выросли' : 'снизились'} на ${formatPercent(Math.abs(mom.change))} к тем же дням прошлого месяца (${money(mom.current)} против ${money(mom.previous)}).`,
+    );
+    for (const c of mom.categories.filter((x) => x.previous > 0 && x.change != null && Math.abs(x.change) >= 0.3 && Math.abs(x.delta) >= 5000).slice(0, 3)) {
+      lines.push(`«${c.name}»: ${c.delta > 0 ? '+' : '−'}${money(Math.abs(c.delta))} (${c.delta > 0 ? '+' : '−'}${formatPercent(Math.abs(c.change))}).`);
+    }
+    const fresh = mom.categories.find((x) => x.previous === 0 && x.current >= 10000);
+    if (fresh) lines.push(`Новая статья: «${fresh.name}» — ${money(fresh.current)}, в прошлом месяце её не было.`);
+  }
+  for (const a of anomalies.slice(0, 2)) {
+    lines.push(`Необычно крупная трата: ${a.merchant || getCategory(a.categoryId).name} — ${money(a.amount)}, обычно около ${money(a.typical)}.`);
+  }
+  return lines;
+}
+
+/* ------------------------------------------------------------------ */
 /* ИИ-советник                                                         */
 /* ------------------------------------------------------------------ */
 
@@ -223,6 +314,8 @@ export const detectProvider = (key = '') => (key.startsWith('sk-ant-') ? 'anthro
 export function buildLLMPayload(transactions, goal, now = new Date()) {
   const rules = buildAdvice(transactions, goal, now);
   const p = rules.profile;
+  const mom = monthOverMonth(transactions, now);
+  const anomalies = detectAnomalies(transactions, now);
   return {
     today: now.toISOString().slice(0, 10),
     currency: 'KZT',
@@ -241,6 +334,17 @@ export function buildLLMPayload(transactions, goal, now = new Date()) {
         count: c.count,
       })),
     },
+    // этот месяц против тех же дней прошлого — что выросло и что упало
+    monthOverMonth: mom.comparable
+      ? {
+          current: Math.round(mom.current),
+          previous: Math.round(mom.previous),
+          changePct: mom.change == null ? null : Math.round(mom.change * 100),
+          byCategory: mom.categories.slice(0, 8).map((c) => ({ category: c.name, current: Math.round(c.current), previous: Math.round(c.previous), delta: Math.round(c.delta) })),
+        }
+      : null,
+    anomalies: anomalies.map((a) => ({ date: a.date.slice(0, 10), merchant: a.merchant, category: getCategory(a.categoryId).name, amount: a.amount, typical: Math.round(a.typical) })),
+    persona: personaSummary(analyzeBehavior(transactions, now)),
     transactions: p.recent
       .filter((t) => t.categoryId !== 'fx' && t.categoryId !== 'own')
       .map((t) => ({
@@ -253,11 +357,12 @@ export function buildLLMPayload(transactions, goal, now = new Date()) {
   };
 }
 
-const SYSTEM_PROMPT = `Ты — опытный личный финансовый советник. Клиент в Казахстане копит на цель; тебе дают сводку и JSON: цель, средние доходы и расходы в месяц, расходы по категориям и операции в тенге (₸).
+const SYSTEM_PROMPT = `Ты — опытный личный финансовый советник. Клиент в Казахстане копит на цель; тебе дают сводку и JSON: цель, средние доходы и расходы в месяц, расходы по категориям, сравнение «этот месяц против тех же дней прошлого» (monthOverMonth), необычно крупные траты (anomalies), поведенческий портрет (persona) и операции в тенге (₸).
 Ответ на русском, коротко и по делу, без вступлений:
 1) Одна строка — главное: сколько уходит в месяц, какую долю дохода клиент откладывает и на что тратит больше всего.
-2) 3–5 действий, самые полезные первыми. Каждое — одна строка: что сделать → сколько ₸ в месяц это освободит → на сколько недель раньше будет цель (от нынешнего темпа).
-Пиши простым живым языком, без банковских терминов и англицизмов. Опирайся только на данные, не придумывай операции. Суммы — в формате «12 500 ₸».`;
+2) Что изменилось: 1–2 строки о самых заметных сдвигах к прошлому месяцу и об аномалиях, если они есть (назови категорию и сумму). Если сравнивать не с чем — пропусти.
+3) 3–5 действий, самые полезные первыми. Учитывай привычки из persona (поздние заказы, мелкие покупки, подписки, выходные). Каждое — одна строка: что сделать → сколько ₸ в месяц это освободит → на сколько недель раньше будет цель (от нынешнего темпа).
+Пиши простым живым языком, прямо и без воды, без банковских терминов и англицизмов («Доходы», «Расходы», а не «кэшфлоу»). Опирайся только на данные, не придумывай операции. Суммы — в формате «12 500 ₸».`;
 
 /**
  * Текст сообщения пользователя: несколько готовых фраз + JSON.

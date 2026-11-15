@@ -4,7 +4,7 @@ import { useFinance } from '../context/FinanceContext.jsx';
 import { OTHER_COLOR } from '../data/categories.js';
 import { cashflowSeries, filterTransactions, inRange, spendingByCategory, totals } from '../utils/analytics.js';
 import { formatShortDate, getPeriodRange, PERIODS, startOfDay } from '../utils/dates.js';
-import { formatPercent } from '../utils/format.js';
+import { formatPercent, formatShare } from '../utils/format.js';
 import { usePrivacy } from '../hooks/usePrivacy.js';
 import CashflowChart from '../components/CashflowChart.jsx';
 import CategoryIcon from '../components/CategoryIcon.jsx';
@@ -148,8 +148,11 @@ export default function Analytics({ now, onPickCategory }) {
                                 style={{ width: `${(c.amount / breakdown[0].amount) * 100}%`, backgroundColor: folded ? OTHER_COLOR : c.category.color }}
                               />
                             </div>
-                            <span className="tabular w-24 text-right text-[12px] text-ink-muted">
-                              {formatPercent(c.share)} · {c.count} опер.
+                            <span className="tabular w-28 shrink-0 text-right text-[12px] text-ink-muted">
+                              <b className="font-semibold text-ink-soft" data-testid="category-share">
+                                {formatShare(c.share)}
+                              </b>{' '}
+                              · {c.count} опер.
                             </span>
                           </div>
                         </button>
