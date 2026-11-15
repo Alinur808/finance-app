@@ -10,3 +10,6 @@ finance-single.html
 # e2e
 test-results
 playwright-report
+
+# deploy patches generated with git format-patch
+*.patch
